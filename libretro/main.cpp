@@ -1341,11 +1341,11 @@ void retro_get_system_info(retro_system_info* info)
 	info->block_extract    = true;
 }
 
-static void retro_set_region(unsigned val)
+void retro_set_region(unsigned val)
 {
 	internal_setting_region = val;
 }
-static unsigned retro_get_region(void)
+unsigned retro_get_region(void)
 {
 	return internal_setting_region;
 }
