@@ -858,12 +858,12 @@ void VMManager::SetPaused(bool paused)
 
 	if (paused)
 	{
-		Console.WriteLn("(VMManager) Pausing...");
+		Console.Debug("(VMManager) Pausing...");
 		SetState(VMState::Paused);
 	}
 	else
 	{
-		Console.WriteLn("(VMManager) Resuming...");
+		Console.Debug("(VMManager) Resuming...");
 		SetState(VMState::Running);
 	}
 }

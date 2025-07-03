@@ -2236,7 +2236,11 @@ void Host::OnGameChanged(const std::string& disc_path,
 {
 	int ret = 0;
 	const char *serial = game_serial.c_str();
-	log_cb(RETRO_LOG_INFO, "serial: %s\n", serial);
+
+	if (!serial[0])
+		return;
+
+	log_cb(RETRO_LOG_INFO, "[GameDB] Serial: %s\n", serial);
 
 	ret = lrps2_ingame_patches(game_serial.c_str(),
 			game_crc,

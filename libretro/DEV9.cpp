@@ -9,18 +9,18 @@ void DEV9configure()
 
 s32 DEV9init()
 {
-    Console.WriteLn("Initializing dev9null");
+    Console.Debug("Initializing Dev9null.");
     return 0;
 }
 
 void DEV9shutdown()
 {
-    Console.WriteLn("Shutting down Dev9null.");
+    Console.Debug("Shutting down Dev9null.");
 }
 
 s32 DEV9open()
 {
-    Console.WriteLn("Opening Dev9null.");
+    Console.Debug("Opening Dev9null.");
     // Get anything ready we need to. Opening and creating hard
     // drive files, for example.
     return 0;
@@ -28,7 +28,7 @@ s32 DEV9open()
 
 void DEV9close()
 {
-    Console.WriteLn("Closing Dev9null.");
+    Console.Debug("Closing Dev9null.");
     // Close files opened.
 }
 

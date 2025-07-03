@@ -94,6 +94,7 @@ struct IConsoleWriter
 	bool WriteLn(const char* fmt, ...) const;
 	bool Error(const char* fmt, ...) const;
 	bool Warning(const char* fmt, ...) const;
+	bool Debug(const char* fmt, ...) const;
 };
 
 extern IConsoleWriter Console;
