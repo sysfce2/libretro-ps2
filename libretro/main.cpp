@@ -48,6 +48,8 @@
 extern std::unique_ptr<GSRendererPGS> g_pgs_renderer;
 #endif
 
+#define RETRO_AUDIO_SAMPLE_BATCH
+
 #if 0
 #define PERF_TEST
 #endif
@@ -76,13 +78,12 @@ retro_environment_t environ_cb;
 retro_video_refresh_t video_cb;
 retro_log_printf_t log_cb;
 retro_audio_sample_t sample_cb;
+static retro_audio_sample_batch_t batch_cb;
 struct retro_hw_render_callback hw_render;
 
 MemorySettingsInterface s_settings_interface;
 
 bool pending_update_av_info = false;
-
-static retro_audio_sample_batch_t batch_cb;
 
 static std::atomic<VMState> cpu_thread_state;
 static std::thread cpu_thread;
@@ -1204,6 +1205,82 @@ void retro_set_audio_sample_batch(retro_audio_sample_batch_t cb) { batch_cb = cb
 void retro_set_video_refresh(retro_video_refresh_t cb) { video_cb = cb; }
 void retro_set_audio_sample(retro_audio_sample_t cb)   { sample_cb = cb; }
 
+static bool audio_ready   = false;
+static float sample_rate  = 48000.0f;
+static float retro_fps    = 60.0f;
+
+/* Audio output buffer */
+static struct {
+   int16_t *data;
+   int32_t size;
+   int32_t capacity;
+} output_audio_buffer = {NULL, 0, 0};
+
+static void ensure_output_audio_buffer_capacity(int32_t capacity)
+{
+#ifdef RETRO_AUDIO_SAMPLE_BATCH
+   if (capacity <= output_audio_buffer.capacity)
+      return;
+
+   output_audio_buffer.data = (int16_t*)realloc(output_audio_buffer.data, capacity * sizeof(*output_audio_buffer.data));
+   output_audio_buffer.capacity = capacity;
+   log_cb(RETRO_LOG_DEBUG, "Output audio buffer capacity set to %d\n", capacity);
+#endif
+}
+
+static void init_output_audio_buffer(int32_t capacity)
+{
+#ifdef RETRO_AUDIO_SAMPLE_BATCH
+   output_audio_buffer.data = NULL;
+   output_audio_buffer.size = 0;
+   output_audio_buffer.capacity = 0;
+   ensure_output_audio_buffer_capacity(capacity);
+#endif
+}
+
+static void free_output_audio_buffer(void)
+{
+#ifdef RETRO_AUDIO_SAMPLE_BATCH
+   free(output_audio_buffer.data);
+   output_audio_buffer.data = NULL;
+   output_audio_buffer.size = 0;
+   output_audio_buffer.capacity = 0;
+#endif
+}
+
+static void upload_output_audio_buffer(void)
+{
+#ifdef RETRO_AUDIO_SAMPLE_BATCH
+   if (!audio_ready)
+   {
+      unsigned samples = (sample_rate / retro_fps);
+      memset(output_audio_buffer.data + output_audio_buffer.size, 0, samples * sizeof(*output_audio_buffer.data));
+      output_audio_buffer.size += samples;
+   }
+   batch_cb(output_audio_buffer.data, output_audio_buffer.size / 2);
+   output_audio_buffer.size = 0;
+
+   audio_ready = false;
+#endif
+}
+
+void retro_audio_queue(const int16_t *data, int32_t samples)
+{
+   if (samples < 1)
+      return;
+#ifdef RETRO_AUDIO_SAMPLE_BATCH
+   if (output_audio_buffer.capacity - output_audio_buffer.size < samples)
+      ensure_output_audio_buffer_capacity((output_audio_buffer.capacity + samples) * 1.5);
+
+   memcpy(output_audio_buffer.data + output_audio_buffer.size, data, samples * sizeof(*output_audio_buffer.data));
+   output_audio_buffer.size += samples;
+
+   audio_ready = true;
+#else
+   sample_cb(data[0], data[1]);
+#endif
+}
+
 void retro_set_environment(retro_environment_t cb)
 {
 	bool no_game = true;
@@ -1325,6 +1402,7 @@ static bool RETRO_CALLCONV get_image_label(unsigned index, char* label, size_t l
 
 void retro_deinit(void)
 {
+	free_output_audio_buffer();
 	// WIN32 doesn't allow canceling threads from global constructors/destructors in a shared library.
 	vu1Thread.Close();
 #ifdef PERF_TEST
@@ -1401,8 +1479,12 @@ void retro_get_system_av_info(retro_system_av_info* info)
 			info->geometry.aspect_ratio = 4.0f / 3.0f;
 			break;
 	}
-	info->timing.fps            = (retro_get_region() == RETRO_REGION_NTSC) ? (60.0f / 1.001f) : 50.0f;
-	info->timing.sample_rate    = 48000;
+
+	info->timing.fps         = (retro_get_region() == RETRO_REGION_NTSC) ? (60.0f / 1.001f) : 50.0f;
+	info->timing.sample_rate = 48000;
+
+	retro_fps                = info->timing.fps;
+	sample_rate              = info->timing.sample_rate;
 }
 
 void retro_reset(void)
@@ -1743,6 +1825,8 @@ void retro_init(void)
 	};
 
 	environ_cb(RETRO_ENVIRONMENT_SET_DISK_CONTROL_EXT_INTERFACE, &disk_control);
+
+	init_output_audio_buffer(2048);
 }
 
 static void get_first_track_from_cue(std::string &path)
@@ -1957,6 +2041,7 @@ void retro_run(void)
 	RETRO_PERFORMANCE_START(pcsx2_run);
 
 	MTGS::MainLoop(false);
+	upload_output_audio_buffer();
 
 	RETRO_PERFORMANCE_STOP(pcsx2_run);
 }

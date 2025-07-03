@@ -30,7 +30,7 @@
 
 #include <libretro.h>
 
-extern retro_audio_sample_t sample_cb;
+extern void retro_audio_queue(const int16_t *data, int32_t samples);
 
 s16 spu2regs[0x010000 / sizeof(s16)];
 s16 _spu2mem[0x200000 / sizeof(s16)];
@@ -273,8 +273,8 @@ __forceinline void TimeUpdate(u32 cClocks)
 		Mix(&snd_buffer[0], &snd_buffer[1]);
 	}
 
-	if (sample_cb && snd_buffer[0] != 0 && snd_buffer[1] != 0)
-		sample_cb(snd_buffer[0], snd_buffer[1]);
+	if (snd_buffer[0] != 0 && snd_buffer[1] != 0)
+		retro_audio_queue(snd_buffer, 2);
 
 	//Update DMA4 interrupt delay counter
 	if (Cores[0].DMAICounter > 0 && (psxRegs.cycle - Cores[0].LastClock) > 0)
