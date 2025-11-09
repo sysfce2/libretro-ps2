@@ -231,16 +231,26 @@ __forceinline void TimeUpdate(u32 cClocks)
 		lClocks += TICKINTERVAL;
 		Cycles++;
 
-		// Start Queued Voices, they start after 2T (Tested on real HW)
-		for(int c = 0; c < 2; c++)
+		for (int c = 0; c < 2; c++)
 		{
-			for (int v = 0; v < 24; v++)
+			if (Cores[c].KeyOff)
 			{
-				if (Cores[c].KeyOn & (1 << v))
+				for (u8 vc = 0; vc < V_Core::NumVoices; vc++)
 				{
-					V_Voice& vc(Cores[c].Voices[v]);
-					if ((Cycles - vc.PlayCycle) >= 2) /* Start queued voice? */
+					if (((Cores[c].KeyOff >> vc) & 1))
+						ADSR_Release(thiscore.Voices[vc].ADSR);
+				}
+				Cores[c].KeyOff = 0;
+			}
+
+			if (Cores[c].KeyOn)
+			{
+				thiscore.Regs.ENDX &= ~(Cores[c].KeyOn);
+				for (int v = 0; v < 24; v++)
+				{
+					if (Cores[c].KeyOn & (1 << v))
 					{
+						V_Voice& vc(Cores[c].Voices[v]);
 						if (vc.StartA & 7)
 							vc.StartA = (vc.StartA + 0xFFFF8) + 0x8;
 
@@ -251,10 +261,12 @@ __forceinline void TimeUpdate(u32 cClocks)
 						vc.SCurrent     = 28;
 						vc.LoopMode     = 0;
 
-						// When SP >= 0 the next sample will be grabbed, we don't want this to happen
-						// instantly because in the case of pitch being 0 we want to delay getting
-						// the next block header. This is a hack to work around the fact that unlike
-						// the HW we don't update the block header on every cycle.
+						/* When SP >= 0 the next sample will be grabbed, 
+						 * we don't want this to happen instantly because 
+						 * in the case of pitch being 0 we want to delay getting
+						 * the next block header. This is a hack to work around the 
+						 * fact that unlike the HW we don't update the block header 
+						 * on every cycle. */
 						vc.SP           = -1;
 
 						vc.LoopFlags    = 0;
@@ -262,12 +274,15 @@ __forceinline void TimeUpdate(u32 cClocks)
 						vc.Prev1        = 0;
 						vc.Prev2        = 0;
 
-						vc.PV1 = vc.PV2 = 0;
-						vc.PV3 = vc.PV4 = 0;
+						vc.PV1          = 0;
+						vc.PV2          = 0;
+						vc.PV3          = 0;
+						vc.PV4          = 0;
 						vc.NextCrest    = -0x8000;
 						Cores[c].KeyOn &= ~(1 << v);
 					}
 				}
+				Cores[c].KeyOn = 0;
 			}
 		}
 		Mix(&snd_buffer[0], &snd_buffer[1]);
@@ -771,39 +786,6 @@ u16 V_Core::ReadRegPS1(u32 mem)
 	return value;
 }
 
-static void StartVoices(V_Core& thiscore, int core, u32 value)
-{
-	thiscore.KeyOn     |=  value;
-	thiscore.Regs.ENDX &= ~value;
-
-	for (u8 vc = 0; vc < V_Core::NumVoices; vc++)
-	{
-		if (!((value >> vc) & 1))
-			continue;
-
-		if ((Cycles - thiscore.Voices[vc].PlayCycle) < 2)
-			continue;
-
-		thiscore.Voices[vc].PlayCycle        = Cycles;
-		thiscore.Voices[vc].LoopCycle        = Cycles - 1; // Get it out of the start range as to not confuse it
-		thiscore.Voices[vc].PendingLoopStart = false;
-	}
-}
-
-static void StopVoices(V_Core& thiscore, int core, u32 value)
-{
-	for (u8 vc = 0; vc < V_Core::NumVoices; vc++)
-	{
-		if (!((value >> vc) & 1))
-			continue;
-
-		if (Cycles - thiscore.Voices[vc].PlayCycle < 2)
-			continue;
-
-		ADSR_Release(thiscore.Voices[vc].ADSR);
-	}
-}
-
 template <int CoreIdx, int VoiceIdx, int param>
 static void RegWrite_VoiceParams(u16 value)
 {
@@ -872,50 +854,24 @@ static void RegWrite_VoiceAddr(u16 value)
 			break;
 
 		case 2:
-			{
-				u32* LoopReg;
-				if ((Cycles - thisvoice.PlayCycle) < 4 && (int)(thisvoice.LoopCycle - thisvoice.PlayCycle) < 0)
-				{
-					LoopReg = &thisvoice.PendingLoopStartA;
-					thisvoice.PendingLoopStart = true;
-				}
-				else
-				{
-					LoopReg = &thisvoice.LoopStartA;
-					thisvoice.LoopMode = 1;
-				}
-
-				*LoopReg = ((u32)(value & 0x0F) << 16) | (*LoopReg & 0xFFF8);
-			}
+			thisvoice.LoopMode = 1;
+			thisvoice.LoopStartA = ((u32)(value & 0x0F) << 16) | (thisvoice.LoopStartA & 0xFFF8);
 			break;
 
 		case 3:
-			{
-				u32* LoopReg;
-				if ((Cycles - thisvoice.PlayCycle) < 4 && (int)(thisvoice.LoopCycle - thisvoice.PlayCycle) < 0)
-				{
-					LoopReg = &thisvoice.PendingLoopStartA;
-					thisvoice.PendingLoopStart = true;
-				}
-				else
-				{
-					LoopReg = &thisvoice.LoopStartA;
-					thisvoice.LoopMode = 1;
-				}
-
-				*LoopReg = (*LoopReg & 0x0F0000) | (value & 0xFFF8);
-			}
+			thisvoice.LoopMode = 1;
+			thisvoice.LoopStartA = (thisvoice.LoopStartA & 0x0F0000) | (value & 0xFFF8);
 			break;
 
 
-			// NAX is confirmed to be writable on hardware (decoder will start decoding at new location).
-			//
-			// Example games:
-			// FlatOut
-			// Soul Reaver 2
-			// Wallace And Gromit: Curse Of The Were-Rabbit.
 
 		case 4:
+			/* NAX is confirmed to be writable on hardware (decoder will start decoding at new location).
+			 *
+			 * Example games:
+			 * FlatOut
+			 * Soul Reaver 2
+			 * Wallace And Gromit: Curse Of The Were-Rabbit. */
 			thisvoice.NextA = ((u32)(value & 0x0F) << 16) | (thisvoice.NextA & 0xFFF8) | 1;
 			thisvoice.SCurrent = 28;
 			break;
@@ -1120,34 +1076,6 @@ static void RegWrite_Core(u16 value)
 			thiscore.Regs.MMIX = value;
 		}
 		break;
-
-		case (REG_S_KON + 2):
-			// Optimization: Games like to write zero to the KeyOn reg a lot, so shortcut
-			// this loop if value is zero.
-			if ((((u32)value) << 16) != 0)
-				StartVoices(thiscore, core, ((u32)value) << 16);
-			spu2regs[omem >> 1 | core * 0x200] = value;
-			break;
-
-		case REG_S_KON:
-			// Optimization: Games like to write zero to the KeyOn reg a lot, so shortcut
-			// this loop if value is zero.
-			if ((u32)value != 0)
-				StartVoices(thiscore, core, ((u32)value));
-			spu2regs[omem >> 1 | core * 0x200] = value;
-			break;
-
-		case (REG_S_KOFF + 2):
-			if ((((u32)value) << 16) != 0)
-				StopVoices(thiscore, core, ((u32)value) << 16);
-			spu2regs[omem >> 1 | core * 0x200] = value;
-			break;
-
-		case REG_S_KOFF:
-			if (((u32)value) != 0)
-				StopVoices(thiscore, core, ((u32)value));
-			spu2regs[omem >> 1 | core * 0x200] = value;
-			break;
 
 		case REG_S_ENDX:
 			thiscore.Regs.ENDX &= 0xff0000;

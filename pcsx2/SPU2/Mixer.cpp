@@ -89,19 +89,6 @@ static __forceinline s32 GetNextDataBuffered(V_Core& thiscore, V_Voice& vc, uint
 {
 	if ((vc.SCurrent & 3) == 0)
 	{
-		if (vc.PendingLoopStart)
-		{
-			if ((Cycles - vc.PlayCycle) >= 4)
-			{
-				if (vc.LoopCycle < vc.PlayCycle)
-				{
-					vc.LoopStartA = vc.PendingLoopStartA;
-					vc.LoopMode = 1;
-				}
-
-				vc.PendingLoopStart = false;
-			}
-		}
 		IncrementNextA(thiscore, vc, voiceidx);
 
 		if ((vc.NextA & 7) == 0) // vc.SCurrent == 24 equivalent
@@ -135,10 +122,7 @@ static __forceinline s32 GetNextDataBuffered(V_Core& thiscore, V_Voice& vc, uint
 		vc.LoopFlags = *memptr >> 8; // grab loop flags from the upper byte.
 
 		if ((vc.LoopFlags & XAFLAG_LOOP_START) && !vc.LoopMode)
-		{
 			vc.LoopStartA = vc.NextA & 0xFFFF8;
-			vc.LoopCycle = Cycles;
-		}
 
 		const int cacheIdx = vc.NextA / pcm_WordsPerBlock;
 		PcmCacheEntry& cacheLine = pcm_cache_data[cacheIdx];
