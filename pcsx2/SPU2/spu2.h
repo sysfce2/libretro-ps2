@@ -35,7 +35,7 @@ namespace SPU2
 
 	/// Returns true if we're currently running in PSX mode.
 	bool IsRunningPSXMode(void);
-} // namespace SPU2
+}
 
 void SPU2write(u32 mem, u16 value);
 u16 SPU2read(u32 mem);
@@ -47,5 +47,3 @@ typedef void RegWriteHandler(u16 value);
 extern RegWriteHandler* const tbl_reg_writes[0x401];
 
 extern void TimeUpdate(u32 cClocks);
-
-//#define PCM24_S1_INTERLEAVE

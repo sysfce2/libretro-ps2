@@ -56,10 +56,10 @@ static void __forceinline XA_decode_block(s16* buffer, const s16* block, s32& pr
 	}
 }
 
-static void __forceinline IncrementNextA(V_Core& thiscore, V_Voice& vc, uint voiceidx)
+static void __forceinline IncrementNextA(V_Core& thiscore, V_Voice& vc)
 {
-	// Important!  Both cores signal IRQ when an address is read, regardless of
-	// which core actually reads the address.
+	/* Important!  Both cores signal IRQ when an address is read, 
+	 * regardless of which core actually reads the address. */
 
 	for (int i = 0; i < 2; i++)
 	{
@@ -89,7 +89,7 @@ static __forceinline s32 GetNextDataBuffered(V_Core& thiscore, V_Voice& vc, uint
 {
 	if ((vc.SCurrent & 3) == 0)
 	{
-		IncrementNextA(thiscore, vc, voiceidx);
+		IncrementNextA(thiscore, vc);
 
 		if ((vc.NextA & 7) == 0) // vc.SCurrent == 24 equivalent
 		{
@@ -155,7 +155,7 @@ static __forceinline s32 GetNextDataBuffered(V_Core& thiscore, V_Voice& vc, uint
 
 static __forceinline void GetNextDataDummy(V_Core& thiscore, V_Voice& vc, uint voiceidx)
 {
-	IncrementNextA(thiscore, vc, voiceidx);
+	IncrementNextA(thiscore, vc);
 
 	if ((vc.NextA & 7) == 0) // vc.SCurrent == 24 equivalent
 	{
@@ -200,17 +200,6 @@ static void __forceinline UpdatePitch(V_Voice& vc, uint coreidx, uint voiceidx)
 
 	pitch     = std::min(pitch, 0x3FFF);
 	vc.SP    += pitch;
-}
-
-static __forceinline void CalculateADSR(V_Core& thiscore, V_Voice& vc, uint voiceidx)
-{
-	if (vc.ADSR.Phase == PHASE_STOPPED)
-		vc.ADSR.Value = 0;
-	else if (!ADSR_Calculate(vc.ADSR, thiscore.Index | (voiceidx << 1)))
-	{
-		vc.ADSR.Value = 0;
-		vc.ADSR.Phase = PHASE_STOPPED;
-	}
 }
 
 static __forceinline s32 GetVoiceValues(V_Core& thiscore, V_Voice& vc, uint voiceidx)
@@ -281,12 +270,11 @@ static __forceinline void UpdateNoise(V_Core& thiscore)
 /////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                     //
 
-// writes a signed value to the SPU2 ram
-// Performs no cache invalidation -- use only for dynamic memory ranges
-// of the SPU2 (between 0x0000 and SPU2_DYN_MEMLINE)
+/* writes a signed value to the SPU2 RAM
+ * Performs no cache invalidation -- use only for dynamic memory ranges
+ * of the SPU2 (between 0x0000 and SPU2_DYN_MEMLINE) */
 static __forceinline void spu2M_WriteFast(u32 addr, s16 value)
 {
-	// Fixes some of the oldest hangs in pcsx2's history! :p
 	for (int i = 0; i < 2; i++)
 	{
 		if (Cores[i].IRQEnable && Cores[i].IRQA == addr)
@@ -379,9 +367,15 @@ static __forceinline StereoOut32 MixVoice(V_Core& thiscore, V_Voice& vc, uint co
 		else
 			Value = GetVoiceValues(thiscore, vc, voiceidx);
 
-		// Update and Apply ADSR  (applies to normal and noise sources)
+		/* Update and Apply ADSR  (applies to normal and noise sources) */
 
-		CalculateADSR(thiscore, vc, voiceidx);
+		if (vc.ADSR.Phase == PHASE_STOPPED)
+			vc.ADSR.Value = 0;
+		else if (!ADSR_Calculate(vc.ADSR))
+		{
+			vc.ADSR.Value = 0;
+			vc.ADSR.Phase = PHASE_STOPPED;
+		}
 		Value     = (Value * vc.ADSR.Value) >> 15;
 		vc.OutX   = Value;
 
@@ -485,27 +479,26 @@ StereoOut32 V_Core::Mix(const VoiceMixSet& inVoices, const StereoOut32& Input, c
 
 	StereoOut32 TW;
 
-	// Mix Input, Voice, and External data:
-
-	TW.Left = Input.Left & WetGate.InpL;
+	/* Mix Input, Voice, and External data: */
+	TW.Left  = Input.Left & WetGate.InpL;
 	TW.Right = Input.Right & WetGate.InpR;
 
-	TW.Left += Voices.Wet.Left & WetGate.SndL;
+	TW.Left  += Voices.Wet.Left & WetGate.SndL;
 	TW.Right += Voices.Wet.Right & WetGate.SndR;
-	TW.Left += Ext.Left & WetGate.ExtL;
+	TW.Left  += Ext.Left & WetGate.ExtL;
 	TW.Right += Ext.Right & WetGate.ExtR;
 
 	StereoOut32 RV  = DoReverb(TW);
 
-	// Mix Dry + Wet
-	// (master volume is applied later to the result of both outputs added together).
+	/* Mix Dry + Wet
+	 * (master volume is applied later to the result of both outputs added together). */
 	TD.Left  += (RV.Left  * FxVol.Left)  >> 15;
 	TD.Right += (RV.Right * FxVol.Right) >> 15;
 	return TD;
 }
 
-// Gcc does not want to inline it when lto is enabled because some functions growth too much.
-// The function is big enought to see any speed impact. -- Gregory
+/* GCC does not want to inline it when lto is enabled because some functions growth too much.
+ * The function is big enough to see any speed impact. -- Gregory */
 #ifndef __POSIX__
 __forceinline
 #endif
@@ -514,12 +507,13 @@ void Mix(short *out_left, short *out_right)
 	StereoOut32 Out;
 	StereoOut32 empty;
 	StereoOut32 Ext;
-	// Note: Playmode 4 is SPDIF, which overrides other inputs.
+	/* Note: Playmode 4 is SPDIF, which overrides other inputs. */
 	StereoOut32 InputData[2];
-	// SPDIF is on Core 0:
-	// Fixme:
-	// 1. We do not have an AC3 decoder for the bitstream.
-	// 2. Games usually provide a normal ADMA stream as well and want to see it getting read!
+	/* SPDIF is on Core 0:
+	 * Fixme:
+	 * 1. We do not have an AC3 decoder for the bitstream.
+	 * 2. Games usually provide a normal ADMA stream as well and want to see it getting read!
+	 */
 
 	empty.Left = empty.Right = 0;
 	if (PlayMode & 8)
@@ -536,8 +530,7 @@ void Mix(short *out_left, short *out_right)
 		InputData[0].Right = (data.Right * Cores[0].InpVol.Right) >> 15;
 	}
 
-	// Todo: Replace me with memzero initializer!
-	VoiceMixSet VoiceData[2]; // mixed voice data for each core.
+	VoiceMixSet VoiceData[2]; /* Mixed voice data for each core. */
 	VoiceData[0].Dry.Left    = 0;
 	VoiceData[0].Dry.Right   = 0;
 	VoiceData[0].Wet.Left    = 0;
@@ -561,7 +554,7 @@ void Mix(short *out_left, short *out_right)
 		Ext.Right = (Ext.Right * Cores[0].MasterVol.Right.Value) >> 15;
 	}
 
-	// Commit Core 0 output to ram before mixing Core 1:
+	/* Commit Core 0 output to ram before mixing Core 1: */
 	spu2M_WriteFast(0x800 + OutPos, Ext.Left);
 	spu2M_WriteFast(0xA00 + OutPos, Ext.Right);
 
@@ -569,8 +562,8 @@ void Mix(short *out_left, short *out_right)
 	Ext.Right = (Ext.Right * Cores[1].ExtVol.Right) >> 15;
 	Out       = Cores[1].Mix(VoiceData[1], InputData[1], Ext);
 
-	// Experimental CDDA support
-	// The CDDA overrides all other mixer output.  It's a direct feed!
+	/* Experimental CDDA support
+	 * The CDDA overrides all other mixer output.  It's a direct feed */
 	if (PlayMode & 8)
 		Out       = Cores[1].ReadInput_HiFi();
 	else
@@ -581,19 +574,19 @@ void Mix(short *out_left, short *out_right)
 		Out.Right = (Out.Right * Cores[1].MasterVol.Right.Value) >> 15;
 	}
 
-	// A simple DC blocking high-pass filter
-	// Implementation from http://peabody.sapp.org/class/dmp2/lab/dcblock/
-	// The magic number 0x7f5c is ceil(INT16_MAX * 0.995)
+	/* A simple DC blocking high-pass filter
+	 * Implementation from http://peabody.sapp.org/class/dmp2/lab/dcblock/
+	 * The magic number 0x7f5c is ceil(INT16_MAX * 0.995) */
 	DCFilterOut.Left  = (Out.Left  - DCFilterIn.Left  + std::clamp((0x7f5c * DCFilterOut.Left)  >> 15, -0x8000, 0x7fff));
 	DCFilterOut.Right = (Out.Right - DCFilterIn.Right + std::clamp((0x7f5c * DCFilterOut.Right) >> 15, -0x8000, 0x7fff));
 	DCFilterIn.Left   = Out.Left;
 	DCFilterIn.Right  = Out.Right;
 
-	// Final clamp, take care not to exceed 16 bits from here on
+	/* Final clamp, take care not to exceed 16 bits from here on */
 	*out_left         = (int16_t)(std::clamp(DCFilterOut.Left,  -0x8000, 0x7fff));
 	*out_right        = (int16_t)(std::clamp(DCFilterOut.Right, -0x8000, 0x7fff));
 
-	// Update AutoDMA output positioning
+	/* Update AutoDMA output positioning */
 	OutPos++;
 	if (OutPos >= 0x200)
 		OutPos = 0;

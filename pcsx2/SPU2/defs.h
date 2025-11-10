@@ -198,7 +198,7 @@ struct V_ADSR
 };
 
 void ADSR_Release(V_ADSR &v);
-bool ADSR_Calculate(V_ADSR &v, int voiceidx);
+bool ADSR_Calculate(V_ADSR &v);
 void ADSR_UpdateCache(V_ADSR &v);
 
 struct V_Voice

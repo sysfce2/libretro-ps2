@@ -16,7 +16,7 @@
 #include <algorithm>
 #include "Global.h"
 
-static constexpr s32 ADSR_MAX_VOL = 0x7fff;
+#define ADSR_MAX_VOL 0x7fff
 
 void ADSR_UpdateCache(V_ADSR &v)
 {
@@ -49,7 +49,7 @@ void ADSR_UpdateCache(V_ADSR &v)
 	v.CachedPhases[PHASE_RELEASE].Target = 0;
 }
 
-bool ADSR_Calculate(V_ADSR &v, int voiceidx)
+bool ADSR_Calculate(V_ADSR &v)
 {
 	auto& p = v.CachedPhases.at(v.Phase);
 
