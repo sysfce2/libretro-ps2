@@ -85,7 +85,7 @@ PcmCacheEntry pcm_cache_data[pcm_BlockCount];
 #define XAFLAG_LOOP (1ul << 1)
 #define XAFLAG_LOOP_START (1ul << 2)
 
-static __forceinline s32 GetNextDataBuffered(V_Core& V_Voice& vc, uint voiceidx)
+static __forceinline s32 GetNextDataBuffered(V_Core& thiscore, V_Voice& vc, uint voiceidx)
 {
 	if ((vc.SCurrent & 3) == 0)
 	{
@@ -202,14 +202,14 @@ static void __forceinline UpdatePitch(V_Voice& vc, uint coreidx, uint voiceidx)
 	vc.SP    += pitch;
 }
 
-static __forceinline s32 GetVoiceValues(V_Voice& vc, uint voiceidx)
+static __forceinline s32 GetVoiceValues(V_Core& thiscore, V_Voice& vc, uint voiceidx)
 {
 	while (vc.SP >= 0)
 	{
 		vc.PV4 = vc.PV3;
 		vc.PV3 = vc.PV2;
 		vc.PV2 = vc.PV1;
-		vc.PV1 = GetNextDataBuffered(vc, voiceidx);
+		vc.PV1 = GetNextDataBuffered(thiscore, vc, voiceidx);
 		vc.SP -= 0x1000;
 	}
 
@@ -365,7 +365,7 @@ static __forceinline StereoOut32 MixVoice(V_Core& thiscore, V_Voice& vc, uint co
 		if (vc.Noise)
 			Value = (s16)thiscore.NoiseOut;
 		else
-			Value = GetVoiceValues(vc, voiceidx);
+			Value = GetVoiceValues(thiscore, vc, voiceidx);
 
 		/* Update and Apply ADSR  (applies to normal and noise sources) */
 
