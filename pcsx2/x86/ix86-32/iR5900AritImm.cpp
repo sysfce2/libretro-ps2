@@ -173,10 +173,10 @@ enum class LogicalOp
 
 static void recLogicalOpI(int info, LogicalOp op)
 {
-	xImpl_G1Logic bad{};
+	xImpl_G1Logic *bad = nullptr;
 	const xImpl_G1Logic& xOP = op == LogicalOp::AND ? xAND : op == LogicalOp::OR ? xOR :
 		op == LogicalOp::XOR    ? xXOR :
-		bad;
+		*bad;
 	if (_ImmU_ != 0)
 	{
 		recMoveStoT64(info);

@@ -457,11 +457,11 @@ namespace
 
 static void rpsxLogicalOp_constv(LogicalOp op, int info, int creg, u32 vreg, int regv)
 {
-	xImpl_G1Logic bad{};
+	xImpl_G1Logic *bad = nullptr;
 	const xImpl_G1Logic& xOP = op == LogicalOp::AND ? xAND : op == LogicalOp::OR ? xOR :
 														 op == LogicalOp::XOR    ? xXOR :
 														 op == LogicalOp::NOR    ? xOR :
-                                                                                   bad;
+                                                                                   *bad;
 	s32 fixedInput, fixedOutput, identityInput;
 	bool hasFixed = true;
 	switch (op)
@@ -510,11 +510,11 @@ static void rpsxLogicalOp_constv(LogicalOp op, int info, int creg, u32 vreg, int
 
 static void rpsxLogicalOp(LogicalOp op, int info)
 {
-	xImpl_G1Logic bad{};
+	xImpl_G1Logic *bad = nullptr;
 	const xImpl_G1Logic& xOP = op == LogicalOp::AND ? xAND : op == LogicalOp::OR ? xOR :
 														 op == LogicalOp::XOR    ? xXOR :
 														 op == LogicalOp::NOR    ? xOR :
-                                                                                   bad;
+                                                                                   *bad;
 	// swap because it's commutative and Rd might be Rt
 	u32 rs = _Rs_, rt = _Rt_;
 	int regs = (info & PROCESS_EE_S) ? EEREC_S : -1, regt = (info & PROCESS_EE_T) ? EEREC_T : -1;
