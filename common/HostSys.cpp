@@ -97,7 +97,7 @@ long __stdcall SysPageFaultExceptionFilter(EXCEPTION_POINTERS* eps)
 
 			s_in_exception_handler = false;
 
-			if handled
+			if (handled)
 				return EXCEPTION_CONTINUE_EXECUTION;
 		}
 	}
@@ -237,7 +237,6 @@ bool HostSys::InstallPageFaultHandler(PageFaultHandler handler)
 
 void HostSys::RemovePageFaultHandler(PageFaultHandler handler)
 {
-	struct sigaction sa;
 	std::unique_lock lock(s_exception_handler_mutex);
 #ifdef _WIN32
 	s_exception_handler_callback = nullptr;
@@ -248,6 +247,7 @@ void HostSys::RemovePageFaultHandler(PageFaultHandler handler)
 		s_exception_handler_handle = {};
 	}
 #else
+	struct sigaction sa;
 	if (!s_exception_handler_callback)
 		return;
 
