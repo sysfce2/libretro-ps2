@@ -58,143 +58,154 @@ void COP2FlagHackPass::Run(u32 start, u32 end, EEINST* inst_cache)
 	m_cfc2_pc = start;
 
 	ForEachInstruction(start, end, inst_cache, [this, end](u32 apc, EEINST* inst) {
-		// catch SB/SH/SW to potential DMA->VIF0->VU0 exec.
-		// this is very unlikely in a cop2 chain.
+		/* Catch SB/SH/SW to potential DMA->VIF0->VU0 exec.
+		 * this is very unlikely in a cop2 chain. */
 		if (_Opcode_ == 050 || _Opcode_ == 051 || _Opcode_ == 053)
 		{
-			CommitAllFlags();
-			return true;
-		}
-		else if (_Opcode_ != 022)
-		{
-			// not COP2
-			return true;
-		}
-
-		// Detect ctc2 Status, zero, ..., cfc2 v0, Status pattern where we need accurate sticky bits.
-		// Test case: Tekken Tag Tournament.
-		if (_Rs_ == 6 && _Rd_ == REG_STATUS_FLAG)
-		{
-			// Read ahead, looking for cfc2.
-			m_cfc2_pc = apc;
-			ForEachInstruction(apc, end, inst, [this](u32 capc, EEINST*) {
-				if (_Opcode_ == 022 && _Rs_ == 2 && _Rd_ == REG_STATUS_FLAG)
-				{
-					m_cfc2_pc = capc;
-					return false;
-				}
-				return true;
-			});
-		}
-
-		// CFC2/CTC2
-		if (_Rs_ == 6 || _Rs_ == 2)
-		{
-			switch (_Rd_)
+			if (m_last_status_write)
 			{
-				case REG_STATUS_FLAG:
-					CommitStatusFlag();
-					break;
-				case REG_MAC_FLAG:
-					CommitMACFlag();
-					break;
-				case REG_CLIP_FLAG:
-					CommitClipFlag();
-					break;
-				case REG_FBRST:
-				{
-					// only apply to CTC2, is FBRST readable?
-					if (_Rs_ == 2)
-						CommitAllFlags();
-				}
-				break;
+				m_last_status_write->info |= EEINST_COP2_STATUS_FLAG | EEINST_COP2_NORMALIZE_STATUS_FLAG;
+				m_status_denormalized = false;
 			}
+			if (m_last_mac_write)
+				m_last_mac_write->info  |= EEINST_COP2_MAC_FLAG;
+			if (m_last_clip_write)
+				m_last_clip_write->info |= EEINST_COP2_CLIP_FLAG;
 		}
-
-		if (((cpuRegs.code >> 25 & 1) == 1) && ((cpuRegs.code >> 2 & 15) == 14))
+		else if (_Opcode_ == 022) /* COP2 ? */
 		{
-			// VCALLMS, everything needs to be up to date
-			CommitAllFlags();
-		}
-
-		// 1 - status, 2 - mac, 3 - clip
-		const int flags = cop2flags(cpuRegs.code);
-		if (flags == 0)
-			return true;
-
-		// STATUS
-		if (flags & 1)
-		{
-			if (!m_status_denormalized)
+			/* Detect CTC2 Status, zero, ..., CFC2 v0, Status pattern where we need accurate sticky bits.
+		 	 * Test case: Tekken Tag Tournament. */
+			if (_Rs_ == 6 && _Rd_ == REG_STATUS_FLAG)
 			{
-				inst->info |= EEINST_COP2_DENORMALIZE_STATUS_FLAG;
-				m_status_denormalized = true;
+				/* Read ahead, looking for CFC2. */
+				m_cfc2_pc = apc;
+				ForEachInstruction(apc, end, inst, [this](u32 capc, EEINST*) {
+						if (_Opcode_ == 022 && _Rs_ == 2 && _Rd_ == REG_STATUS_FLAG)
+						{
+							m_cfc2_pc = capc;
+							return false;
+						}
+						return true;
+				});
 			}
 
-			// If we're still behind the next CFC2 after the sticky bits got cleared, we need to update flags.
-			// Also do this if we're a vsqrt/vrsqrt/vdiv, these update status unconditionally.
-			const u32 sub_opcode = (cpuRegs.code & 3) | ((cpuRegs.code >> 4) & 0x7c);
-			if (apc < m_cfc2_pc || (_Rs_ >= 020 && _Funct_ >= 074 && sub_opcode >= 070 && sub_opcode <= 072))
-				inst->info |= EEINST_COP2_STATUS_FLAG;
+			/* CFC2/CTC2 */
+			if (_Rs_ == 6 || _Rs_ == 2)
+			{
+				switch (_Rd_)
+				{
+					case REG_STATUS_FLAG:
+						if (m_last_status_write)
+						{
+							m_last_status_write->info |= EEINST_COP2_STATUS_FLAG | EEINST_COP2_NORMALIZE_STATUS_FLAG;
+							m_status_denormalized = false;
+						}
+						break;
+					case REG_MAC_FLAG:
+						if (m_last_mac_write)
+							m_last_mac_write->info  |= EEINST_COP2_MAC_FLAG;
+						break;
+					case REG_CLIP_FLAG:
+						if (m_last_clip_write)
+							m_last_clip_write->info |= EEINST_COP2_CLIP_FLAG;
+						break;
+					case REG_FBRST:
+						{
+							/* only apply to CTC2, is FBRST readable? */
+							if (_Rs_ == 2)
+							{
+								if (m_last_status_write)
+								{
+									m_last_status_write->info |= EEINST_COP2_STATUS_FLAG | EEINST_COP2_NORMALIZE_STATUS_FLAG;
+									m_status_denormalized = false;
+								}
+								if (m_last_mac_write)
+									m_last_mac_write->info  |= EEINST_COP2_MAC_FLAG;
+								if (m_last_clip_write)
+									m_last_clip_write->info |= EEINST_COP2_CLIP_FLAG;
+							}
+						}
+						break;
+				}
+			}
 
-			m_last_status_write = inst;
+			/* VCALLMS, everything needs to be up to date */
+			if (((cpuRegs.code >> 25 & 1) == 1) && ((cpuRegs.code >> 2 & 15) == 14))
+			{
+				if (m_last_status_write)
+				{
+					m_last_status_write->info |= EEINST_COP2_STATUS_FLAG | EEINST_COP2_NORMALIZE_STATUS_FLAG;
+					m_status_denormalized = false;
+				}
+				if (m_last_mac_write)
+					m_last_mac_write->info  |= EEINST_COP2_MAC_FLAG;
+				if (m_last_clip_write)
+					m_last_clip_write->info |= EEINST_COP2_CLIP_FLAG;
+			}
+
+			/* 1 - status, 2 - mac, 3 - clip */
+			const int flags = cop2flags(cpuRegs.code);
+			if (flags != 0)
+			{
+				/* STATUS */
+				if (flags & 1)
+				{
+					if (!m_status_denormalized)
+					{
+						inst->info |= EEINST_COP2_DENORMALIZE_STATUS_FLAG;
+						m_status_denormalized = true;
+					}
+
+					/* If we're still behind the next CFC2 after the sticky bits got cleared, 
+					 * we need to update flags.
+					 * Also do this if we're a vsqrt/vrsqrt/vdiv, 
+					 * these update status unconditionally. */
+					const u32 sub_opcode = (cpuRegs.code & 3) | ((cpuRegs.code >> 4) & 0x7c);
+					if (apc < m_cfc2_pc || (_Rs_ >= 020 && _Funct_ >= 074 
+								&& sub_opcode >= 070 && sub_opcode <= 072))
+						inst->info |= EEINST_COP2_STATUS_FLAG;
+
+					m_last_status_write = inst;
+				}
+
+				/* MAC */
+				if (flags & 2)
+					m_last_mac_write = inst;
+
+				/* CLIP */
+				if (flags & 4)
+				{
+					/* We don't track the clip flag yet..
+					 * but it's unlikely that we'll have 
+					 * more than 4 clip flags in a row, 
+					 * because that would be pointless? */
+					inst->info |= EEINST_COP2_CLIP_FLAG;
+					m_last_clip_write = inst;
+				}
+			}
 		}
-
-		// MAC
-		if (flags & 2)
-			m_last_mac_write = inst;
-
-		// CLIP
-		if (flags & 4)
-		{
-			// we don't track the clip flag yet..
-			// but it's unlikely that we'll have more than 4 clip flags in a row, because that would be pointless?
-			inst->info |= EEINST_COP2_CLIP_FLAG;
-			m_last_clip_write = inst;
-		}
-
 		return true;
 	});
 
-	CommitAllFlags();
-}
-
-void COP2FlagHackPass::CommitStatusFlag()
-{
 	if (m_last_status_write)
 	{
 		m_last_status_write->info |= EEINST_COP2_STATUS_FLAG | EEINST_COP2_NORMALIZE_STATUS_FLAG;
-		m_status_denormalized = false;
+		m_status_denormalized      = false;
 	}
-}
-
-void COP2FlagHackPass::CommitMACFlag()
-{
 	if (m_last_mac_write)
-		m_last_mac_write->info |= EEINST_COP2_MAC_FLAG;
-}
-
-void COP2FlagHackPass::CommitClipFlag()
-{
+		m_last_mac_write->info  |= EEINST_COP2_MAC_FLAG;
 	if (m_last_clip_write)
 		m_last_clip_write->info |= EEINST_COP2_CLIP_FLAG;
 }
 
-void COP2FlagHackPass::CommitAllFlags()
-{
-	CommitStatusFlag();
-	CommitMACFlag();
-	CommitClipFlag();
-}
-
-COP2MicroFinishPass::COP2MicroFinishPass() = default;
-
+COP2MicroFinishPass::COP2MicroFinishPass()  = default;
 COP2MicroFinishPass::~COP2MicroFinishPass() = default;
 
 void COP2MicroFinishPass::Run(u32 start, u32 end, EEINST* inst_cache)
 {
-	bool needs_vu0_sync = true;
-	bool needs_vu0_finish = true;
+	bool needs_vu0_sync    = true;
+	bool needs_vu0_finish  = true;
 	bool block_interlocked = CHECK_FULLVU0SYNCHACK;
 
 	// First pass through the block to find out if it's interlocked or not. If it is, we need to use tighter
@@ -239,12 +250,15 @@ void COP2MicroFinishPass::Run(u32 start, u32 end, EEINST* inst_cache)
 			ForEachInstruction(apc + 4, end, inst_cache + 1, [&following_needs_finish](u32 apc2, EEINST* inst2) {
 				if (_Opcode_ == 022)
 				{
-					// For VCALLMS/VCALLMSR, we only sync, because the VCALLMS in itself will finish.
-					// Since we're paying the cost of syncing anyway, better to be less risky.
+					// For VCALLMS/VCALLMSR, we only sync, 
+					// because the VCALLMS in itself will finish.
+					// Since we're paying the cost of syncing anyway, 
+					// better to be less risky.
 					if (_Rs_ >= 020 && (_Funct_ == 070 || _Funct_ == 071))
 						return false;
 
-					// Allow the finish from COP2 to be moved to the first LQC2 of LQC2..QMTC2..COP2.
+					// Allow the finish from COP2 to be moved to the 
+					// first LQC2 of LQC2..QMTC2..COP2.
 					// Otherwise, keep searching for a finishing COP2.
 					following_needs_finish = _Rs_ >= 020;
 					if (following_needs_finish)
@@ -256,35 +270,32 @@ void COP2MicroFinishPass::Run(u32 start, u32 end, EEINST* inst_cache)
 			if (following_needs_finish && !block_interlocked)
 			{
 				inst->info |= EEINST_COP2_FLUSH_VU0_REGISTERS | EEINST_COP2_FINISH_VU0;
-				needs_vu0_sync = false;
+				needs_vu0_sync   = false;
 				needs_vu0_finish = false;
 			}
 			else
 			{
 				inst->info |= EEINST_COP2_FLUSH_VU0_REGISTERS | EEINST_COP2_SYNC_VU0;
-				needs_vu0_sync = block_interlocked || (is_non_interlocked_move && likely_clear);
+				needs_vu0_sync   = block_interlocked || (is_non_interlocked_move && likely_clear);
 				needs_vu0_finish = true;
 			}
-
-			return true;
 		}
-
-		// Look for COP2 instructions.
-		if (_Opcode_ != 022)
-			return true;
-
-		// Set the flag on the current instruction, and clear it for the next.
-		if (_Rs_ >= 020 && needs_vu0_finish)
+		/* Look for COP2 instructions. */
+		else if (_Opcode_ == 022)
 		{
-			inst->info |= EEINST_COP2_FLUSH_VU0_REGISTERS | EEINST_COP2_FINISH_VU0;
-			needs_vu0_finish = false;
-			needs_vu0_sync = false;
-		}
-		else if (needs_vu0_sync)
-		{
-			// Starting a sync-free block!
-			inst->info |= EEINST_COP2_FLUSH_VU0_REGISTERS | EEINST_COP2_SYNC_VU0;
-			needs_vu0_sync = block_interlocked;
+			/* Set the flag on the current instruction, and clear it for the next. */
+			if (_Rs_ >= 020 && needs_vu0_finish)
+			{
+				inst->info |= EEINST_COP2_FLUSH_VU0_REGISTERS | EEINST_COP2_FINISH_VU0;
+				needs_vu0_finish = false;
+				needs_vu0_sync   = false;
+			}
+			else if (needs_vu0_sync)
+			{
+				/* Starting a sync-free block! */
+				inst->info     |= EEINST_COP2_FLUSH_VU0_REGISTERS | EEINST_COP2_SYNC_VU0;
+				needs_vu0_sync  = block_interlocked;
+			}
 		}
 
 		return true;

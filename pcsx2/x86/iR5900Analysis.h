@@ -44,11 +44,6 @@ namespace R5900
 		void Run(u32 start, u32 end, EEINST* inst_cache) override;
 
 	private:
-		void CommitStatusFlag();
-		void CommitMACFlag();
-		void CommitClipFlag();
-		void CommitAllFlags();
-
 		bool m_status_denormalized = false;
 		EEINST* m_last_status_write = nullptr;
 		EEINST* m_last_mac_write = nullptr;
