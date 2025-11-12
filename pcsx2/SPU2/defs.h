@@ -50,14 +50,6 @@ struct V_CoreRegs
 	u16 _1AC;
 };
 
-struct V_VoiceGates
-{
-	s32 DryL; // 'AND Gate' for Direct Output to Left Channel
-	s32 DryR; // 'AND Gate' for Direct Output for Right Channel
-	s32 WetL; // 'AND Gate' for Effect Output for Left Channel
-	s32 WetR; // 'AND Gate' for Effect Output for Right Channel
-};
-
 struct V_CoreGates
 {
 	s32 InpL; // Sound Data Input to Direct Output (Left)
@@ -76,7 +68,7 @@ struct VoiceMixSet
 
 extern V_Core Cores[2];
 extern V_Voice Voices[48];
-extern V_VoiceGates VoiceGates[48];
+extern V_VoiceData VoiceData;
 extern V_SPDIF Spdif;
 
 // Output Buffer Writing Position (the same for all data);
@@ -202,6 +194,15 @@ struct V_ADSR
 void ADSR_Release(V_ADSR &v);
 bool ADSR_Calculate(V_ADSR &v);
 void ADSR_UpdateCache(V_ADSR &v);
+
+/* SOA representation of voices */
+struct V_VoiceData
+{
+	s32 DryL[48]; /* 'AND Gate' for Direct Output to Left Channel */
+	s32 DryR[48]; /* 'AND Gate' for Direct Output for Right Channel */
+	s32 WetL[48]; /* 'AND Gate' for Effect Output for Left Channel */
+	s32 WetR[48]; /* 'AND Gate' for Effect Output for Right Channel */
+};
 
 struct V_Voice
 {

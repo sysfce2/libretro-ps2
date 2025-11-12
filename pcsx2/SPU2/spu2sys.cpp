@@ -35,7 +35,7 @@ extern void retro_audio_queue(const int16_t *data, int32_t samples);
 s16 spu2regs[0x010000 / sizeof(s16)];
 s16 _spu2mem[0x200000 / sizeof(s16)];
 
-V_VoiceGates VoiceGates[48];
+V_VoiceData VoiceData;
 V_Voice Voices[48];
 V_Core Cores[2];
 V_SPDIF Spdif;
@@ -150,10 +150,10 @@ void V_Core::Init(int index)
 
 	for (uint v = 0; v < 48; ++v)
 	{
-		VoiceGates[v].DryL = -1;
-		VoiceGates[v].DryR = -1;
-		VoiceGates[v].WetL = -1;
-		VoiceGates[v].WetR = -1;
+		VoiceData.DryL[v] = -1;
+		VoiceData.DryR[v] = -1;
+		VoiceData.WetL[v] = -1;
+		VoiceData.WetR[v] = -1;
 
 		Voices[v].Volume.Left.Reg_VOL = 0;
 		Voices[v].Volume.Left.Counter = 0;
@@ -971,7 +971,7 @@ static void RegWrite_Core(u16 value)
 					break;
 				const uint start_voice = core ? 24 : 0;
 				for (uint vc = 0, vx = 1; vc < 16; ++vc, vx <<= 1)
-					VoiceGates[start_voice + vc].DryL = (value & vx) ? -1 : 0;
+					VoiceData.mask_out[start_voice + vc] = (value & vx) ? -1 : 0;
 			}
 			break;
 
@@ -983,7 +983,7 @@ static void RegWrite_Core(u16 value)
 					break;
 				const uint start_voice = core ? 24 : 0;
 				for (uint vc = 16, vx = 1; vc < 24; ++vc, vx <<= 1)
-					VoiceGates[start_voice + vc].DryL = (value & vx) ? -1 : 0;
+					VoiceData.mask_out[start_voice + vc] = (value & vx) ? -1 : 0;
 			}
 			break;
 
@@ -995,7 +995,7 @@ static void RegWrite_Core(u16 value)
 					break;
 				const uint start_voice = core ? 24 : 0;
 				for (uint vc = 0, vx = 1; vc < 16; ++vc, vx <<= 1)
-					VoiceGates[start_voice + vc].WetL = (value & vx) ? -1 : 0;
+					VoiceData.mask_out[start_voice + vc] = (value & vx) ? -1 : 0;
 			}
 			break;
 
@@ -1007,7 +1007,7 @@ static void RegWrite_Core(u16 value)
 					break;
 				const uint start_voice = core ? 24 : 0;
 				for (uint vc = 16, vx = 1; vc < 24; ++vc, vx <<= 1)
-					VoiceGates[start_voice + vc].WetL = (value & vx) ? -1 : 0;
+					VoiceData.mask_out[start_voice + vc] = (value & vx) ? -1 : 0;
 			}
 			break;
 
@@ -1019,7 +1019,7 @@ static void RegWrite_Core(u16 value)
 					break;
 				const uint start_voice = core ? 24 : 0;
 				for (uint vc = 0, vx = 1; vc < 16; ++vc, vx <<= 1)
-					VoiceGates[start_voice + vc].DryR = (value & vx) ? -1 : 0;
+					VoiceData.mask_out[start_voice + vc] = (value & vx) ? -1 : 0;
 			}
 			break;
 
@@ -1031,7 +1031,7 @@ static void RegWrite_Core(u16 value)
 					break;
 				const uint start_voice = core ? 24 : 0;
 				for (uint vc = 16, vx = 1; vc < 24; ++vc, vx <<= 1)
-					VoiceGates[start_voice + vc].DryR = (value & vx) ? -1 : 0;
+					VoiceData.mask_out[start_voice + vc] = (value & vx) ? -1 : 0;
 			}
 			break;
 
@@ -1043,7 +1043,7 @@ static void RegWrite_Core(u16 value)
 					break;
 				const uint start_voice = core ? 24 : 0;
 				for (uint vc = 0, vx = 1; vc < 16; ++vc, vx <<= 1)
-					VoiceGates[start_voice + vc].WetR = (value & vx) ? -1 : 0;
+					VoiceData.mask_out[start_voice + vc] = (value & vx) ? -1 : 0;
 			}
 			break;
 
@@ -1055,7 +1055,7 @@ static void RegWrite_Core(u16 value)
 					break;
 				const uint start_voice = core ? 24 : 0;
 				for (uint vc = 16, vx = 1; vc < 24; ++vc, vx <<= 1)
-					VoiceGates[start_voice + vc].WetR = (value & vx) ? -1 : 0;
+					VoiceData.mask_out[start_voice + vc] = (value & vx) ? -1 : 0;
 			}
 			break;
 
