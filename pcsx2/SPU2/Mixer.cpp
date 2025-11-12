@@ -146,7 +146,7 @@ static __forceinline void DecodeSamples(V_Core& thiscore, V_Voice& vc, uint core
 	if (((int)(vc.DecPosWrite - vc.DecPosRead)) > 12)
 		return;
 
-	if (vc.ADSR.Phase > V_ADSR::PHASE_STOPPED)
+	if (vc.ADSR.Phase > PHASE_STOPPED)
 		GetNextDataBuffered(vc);
 
 	vc.DecPosWrite += 4;
@@ -159,7 +159,10 @@ static __forceinline void DecodeSamples(V_Core& thiscore, V_Voice& vc, uint core
 			thiscore.Regs.ENDX |= (1 << voiceidx);
 			vc.NextA = vc.LoopStartA;
 			if (!(vc.LoopFlags & XAFLAG_LOOP))
-				vc.Stop();
+			{
+				vc.ADSR.Value = 0;
+				vc.ADSR.Phase = PHASE_STOPPED;
+			}
 		}
 
 		IncrementNextA(vc);
@@ -401,17 +404,17 @@ static __forceinline StereoOut32 MixCore(const uint coreidx,
 	/* Write Mixed results To Output Area */
 	if (thiscore.Index == 0)
 	{
-		spu2M_WriteFast(0x1000 + thiscore.OutPos, Voices.Dry.Left);
-		spu2M_WriteFast(0x1200 + thiscore.OutPos, Voices.Dry.Right);
-		spu2M_WriteFast(0x1400 + thiscore.OutPos, Voices.Wet.Left);
-		spu2M_WriteFast(0x1600 + thiscore.OutPos, Voices.Wet.Right);
+		spu2M_WriteFast(0x1000 + OutPos, Voices.Dry.Left);
+		spu2M_WriteFast(0x1200 + OutPos, Voices.Dry.Right);
+		spu2M_WriteFast(0x1400 + OutPos, Voices.Wet.Left);
+		spu2M_WriteFast(0x1600 + OutPos, Voices.Wet.Right);
 	}
 	else
 	{
-		spu2M_WriteFast(0x1800 + thiscore.OutPos, Voices.Dry.Left);
-		spu2M_WriteFast(0x1A00 + thiscore.OutPos, Voices.Dry.Right);
-		spu2M_WriteFast(0x1C00 + thiscore.OutPos, Voices.Wet.Left);
-		spu2M_WriteFast(0x1E00 + thiscore.OutPos, Voices.Wet.Right);
+		spu2M_WriteFast(0x1800 + OutPos, Voices.Dry.Left);
+		spu2M_WriteFast(0x1A00 + OutPos, Voices.Dry.Right);
+		spu2M_WriteFast(0x1C00 + OutPos, Voices.Wet.Left);
+		spu2M_WriteFast(0x1E00 + OutPos, Voices.Wet.Right);
 	}
 
 	/* Mix in the Input data */
