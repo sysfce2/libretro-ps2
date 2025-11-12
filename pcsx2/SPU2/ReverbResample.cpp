@@ -3,7 +3,21 @@
 #include "../GS/GSVector.h"
 #include "Global.h"
 
-#define CLAMP(val, minval, maxval) (std::min(maxval, std::max(minval, val)))
+#ifndef MAX
+/**
+ * @return \c a or \c b, whichever is larger.
+ */
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
+
+#ifndef MIN
+/**
+ * @return \c a or \c b, whichever is smaller.
+ */
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+
+#define CLAMP(val, minval, maxval) (MIN(maxval, MAX(minval, val)))
 
 MULTI_ISA_UNSHARED_START
 
