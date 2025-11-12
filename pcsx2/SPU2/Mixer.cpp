@@ -196,9 +196,12 @@ static void __forceinline UpdatePitch(V_Voice& vc, uint coreidx, uint voiceidx)
 	//   most of the time.  Now it'll just check Modulated and short-circuit past the voice
 	//   check (not that it amounts to much, but eh every little bit helps).
 	if ((vc.Modulated == 0) || (voiceidx == 0))
-		pitch     = vc.Pitch;
+		pitch      = vc.Pitch;
 	else
-		pitch     = std::clamp((vc.Pitch * (32768 + Cores[coreidx].Voices[voiceidx - 1].OutX)) >> 15, 0, 0x3fff);
+	{
+		s32 newval = (vc.Pitch * (32768 + Cores[coreidx].Voices[voiceidx - 1].OutX)) >> 15;
+		pitch      = CLAMP(newval, 0, 0x3fff);
+	}
 
 	pitch     = std::min(pitch, 0x3FFF);
 	vc.SP    += pitch;
@@ -579,8 +582,12 @@ void Mix(short *out_left, short *out_right)
 	/* A simple DC blocking high-pass filter
 	 * Implementation from http://peabody.sapp.org/class/dmp2/lab/dcblock/
 	 * The magic number 0x7f5c is ceil(INT16_MAX * 0.995) */
-	DCFilterOut.Left  = (Out.Left  - DCFilterIn.Left  + std::clamp((0x7f5c * DCFilterOut.Left)  >> 15, -0x8000, 0x7fff));
-	DCFilterOut.Right = (Out.Right - DCFilterIn.Right + std::clamp((0x7f5c * DCFilterOut.Right) >> 15, -0x8000, 0x7fff));
+	{
+		s32 newval_l      = CLAMP((0x7f5c * DCFilterOut.Left)  >> 15, -0x8000, 0x7fff);
+		s32 newval_r      = CLAMP((0x7f5c * DCFilterOut.Right) >> 15, -0x8000, 0x7fff);
+		DCFilterOut.Left  = (Out.Left  - DCFilterIn.Left  + newval_l);
+		DCFilterOut.Right = (Out.Right - DCFilterIn.Right + newval_r);
+	}
 	DCFilterIn.Left   = Out.Left;
 	DCFilterIn.Right  = Out.Right;
 
