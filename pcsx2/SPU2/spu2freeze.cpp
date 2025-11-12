@@ -101,18 +101,15 @@ s32 SPU2Savestate::ThawIt(DataBlock& spud)
 	}
 	else
 	{
-		//TODO/FIXME - implement this?
-		//SndBuffer::ClearContents();
-
 		memcpy(spu2regs, spud.unkregs, sizeof(spud.unkregs));
 		memcpy(_spu2mem, spud.mem, sizeof(spud.mem));
 
-		memcpy(VoiceData, spud.VoiceData, sizeof(VoiceData));
+		memcpy(&VoiceData, &spud.VoiceData, sizeof(VoiceData));
 		memcpy(Voices, spud.Voices, sizeof(Voices));
 		memcpy(Cores, spud.Cores, sizeof(Cores));
 		memcpy(&Spdif, &spud.Spdif, sizeof(Spdif));
 
-		// Reverse the pointer offset from above.
+		/* Reverse the pointer offset from above. */
 #define FIX_POINTER(x) \
 	if ((x) == reinterpret_cast<decltype(x)>(-1)) \
 		x = nullptr; \
@@ -136,8 +133,8 @@ s32 SPU2Savestate::ThawIt(DataBlock& spud)
 
 		memset(pcm_cache_data, 0, pcm_BlockCount * sizeof(PcmCacheEntry));
 
-		// Go through the V_Voice structs and recalculate SBuffer pointer from
-		// the NextA setting.
+		/* Go through the V_Voice structs and recalculate SBuffer pointer from
+		 * the NextA setting. */
 
 		for (int v = 0; v < 48; v++)
 		{

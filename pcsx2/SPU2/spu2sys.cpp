@@ -277,7 +277,7 @@ __forceinline void TimeUpdate(u32 cClocks)
 						thisvc.SBuffer      = nullptr;
 						thisvc.DecPosRead   = 0;
 						thisvc.DecPosWrite  = 0;
-						Cores[c].KeyOn     &= ~(1 << v);
+						Cores[c].KeyOn     &= ~(1 << bit);
 					}
 				}
 				Cores[c].KeyOn = 0;
@@ -787,10 +787,10 @@ u16 V_Core::ReadRegPS1(u32 mem)
 template <int CoreIdx, int VoiceIdx, int param>
 static void RegWrite_VoiceParams(u16 value)
 {
-	const int core = CoreIdx;
-	const int voice = VoiceIdx;
+	const int core     = CoreIdx;
+	const int voice    = VoiceIdx + (core * 24);
 
-	V_Voice& thisvoice = Cores[core].Voices[voice];
+	V_Voice& thisvoice = Voices[voice];
 
 	switch (param)
 	{
@@ -971,7 +971,7 @@ static void RegWrite_Core(u16 value)
 					break;
 				const uint start_voice = core ? 24 : 0;
 				for (uint vc = 0, vx = 1; vc < 16; ++vc, vx <<= 1)
-					VoiceData.mask_out[start_voice + vc] = (value & vx) ? -1 : 0;
+					VoiceData.DryL[start_voice + vc] = (value & vx) ? -1 : 0;
 			}
 			break;
 
@@ -983,7 +983,7 @@ static void RegWrite_Core(u16 value)
 					break;
 				const uint start_voice = core ? 24 : 0;
 				for (uint vc = 16, vx = 1; vc < 24; ++vc, vx <<= 1)
-					VoiceData.mask_out[start_voice + vc] = (value & vx) ? -1 : 0;
+					VoiceData.DryL[start_voice + vc] = (value & vx) ? -1 : 0;
 			}
 			break;
 
@@ -995,7 +995,7 @@ static void RegWrite_Core(u16 value)
 					break;
 				const uint start_voice = core ? 24 : 0;
 				for (uint vc = 0, vx = 1; vc < 16; ++vc, vx <<= 1)
-					VoiceData.mask_out[start_voice + vc] = (value & vx) ? -1 : 0;
+					VoiceData.WetL[start_voice + vc] = (value & vx) ? -1 : 0;
 			}
 			break;
 
@@ -1007,7 +1007,7 @@ static void RegWrite_Core(u16 value)
 					break;
 				const uint start_voice = core ? 24 : 0;
 				for (uint vc = 16, vx = 1; vc < 24; ++vc, vx <<= 1)
-					VoiceData.mask_out[start_voice + vc] = (value & vx) ? -1 : 0;
+					VoiceData.WetL[start_voice + vc] = (value & vx) ? -1 : 0;
 			}
 			break;
 
@@ -1019,7 +1019,7 @@ static void RegWrite_Core(u16 value)
 					break;
 				const uint start_voice = core ? 24 : 0;
 				for (uint vc = 0, vx = 1; vc < 16; ++vc, vx <<= 1)
-					VoiceData.mask_out[start_voice + vc] = (value & vx) ? -1 : 0;
+					VoiceData.DryR[start_voice + vc] = (value & vx) ? -1 : 0;
 			}
 			break;
 
@@ -1031,7 +1031,7 @@ static void RegWrite_Core(u16 value)
 					break;
 				const uint start_voice = core ? 24 : 0;
 				for (uint vc = 16, vx = 1; vc < 24; ++vc, vx <<= 1)
-					VoiceData.mask_out[start_voice + vc] = (value & vx) ? -1 : 0;
+					VoiceData.DryR[start_voice + vc] = (value & vx) ? -1 : 0;
 			}
 			break;
 
@@ -1043,7 +1043,7 @@ static void RegWrite_Core(u16 value)
 					break;
 				const uint start_voice = core ? 24 : 0;
 				for (uint vc = 0, vx = 1; vc < 16; ++vc, vx <<= 1)
-					VoiceData.mask_out[start_voice + vc] = (value & vx) ? -1 : 0;
+					VoiceData.WetR[start_voice + vc] = (value & vx) ? -1 : 0;
 			}
 			break;
 
@@ -1055,7 +1055,7 @@ static void RegWrite_Core(u16 value)
 					break;
 				const uint start_voice = core ? 24 : 0;
 				for (uint vc = 16, vx = 1; vc < 24; ++vc, vx <<= 1)
-					VoiceData.mask_out[start_voice + vc] = (value & vx) ? -1 : 0;
+					VoiceData.WetR[start_voice + vc] = (value & vx) ? -1 : 0;
 			}
 			break;
 
