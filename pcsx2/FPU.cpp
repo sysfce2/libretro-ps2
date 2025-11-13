@@ -99,15 +99,8 @@ static bool checkUnderflow(u32& xReg, u32 cFlagsToSet) {
 	return false;
 }
 
-__fi u32 fp_max(u32 a, u32 b)
-{
-	return ((s32)a < 0 && (s32)b < 0) ? MIN(a, b) : MAX(a, b);
-}
-
-__fi u32 fp_min(u32 a, u32 b)
-{
-	return ((s32)a < 0 && (s32)b < 0) ? MAX(a, b) : MIN(a, b);
-}
+#define fp_max(a, b) (((s32)(a) < 0 && (s32)(b) < 0) ? MIN((a), (b)) : MAX((a), (b)))
+#define fp_min(a, b) (((s32)(a) < 0 && (s32)(b) < 0) ? MAX((a), (b)) : MIN((a), (b)))
 
 /*	Checks if Divide by Zero will occur. (z/y = x)
 	cFlagsToSet1 = Flags to set if (z != 0)

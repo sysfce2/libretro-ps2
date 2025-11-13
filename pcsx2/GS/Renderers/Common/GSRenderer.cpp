@@ -298,33 +298,32 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 		g_gs_device->ResetAPIState();
 		if (BeginPresentFrame(true))
 			g_gs_device->EndPresent();
-		goto end;
 	}
-
-	if (!idle_frame)
-		g_gs_device->AgePool();
-
-	/* For D3D11 we call ResetAPIState a bit later or we'll get a black screen */
-        const bool is_d3d11 = (g_gs_device->GetRenderAPI() == RenderAPI::D3D11);
-	if (!is_d3d11)
-		g_gs_device->ResetAPIState();
-	if (BeginPresentFrame(false))
+	else
 	{
-		GSTexture* current = g_gs_device->GetCurrent();
-		if (current && !blank_frame)
-		{
-			GSVector4 src_uv        = GSVector4(0, 0, 1, 1);
-			GSVector4 draw_rect     = GSVector4(0, 0, current->GetWidth(), current->GetHeight());
+		if (!idle_frame)
+			g_gs_device->AgePool();
 
-			g_gs_device->PresentRect(current, src_uv, nullptr, draw_rect);
-		}
-		if (is_d3d11)
+		/* For D3D11 we call ResetAPIState a bit later or we'll get a black screen */
+		if (!(g_gs_device->GetRenderAPI() == RenderAPI::D3D11))
 			g_gs_device->ResetAPIState();
+		if (BeginPresentFrame(false))
+		{
+			GSTexture* current = g_gs_device->GetCurrent();
+			if (current && !blank_frame)
+			{
+				GSVector4 src_uv        = GSVector4(0, 0, 1, 1);
+				GSVector4 draw_rect     = GSVector4(0, 0, current->GetWidth(), current->GetHeight());
 
-		g_gs_device->EndPresent();
+				g_gs_device->PresentRect(current, src_uv, nullptr, draw_rect);
+			}
+			if ((g_gs_device->GetRenderAPI() == RenderAPI::D3D11))
+				g_gs_device->ResetAPIState();
+
+			g_gs_device->EndPresent();
+		}
 	}
 
-end:
 	g_gs_device->RestoreAPIState();
 	PerformanceMetrics::Update(registers_written, fb_sprite_frame);
 }
