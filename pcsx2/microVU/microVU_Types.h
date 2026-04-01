@@ -73,9 +73,10 @@ union alignas(16) microRegInfo
 struct microProgram;
 struct microJumpCache
 {
-	microJumpCache() : prog(NULL), x86ptrStart(NULL) {}
+	microJumpCache() : prog(NULL), x86ptrStart(NULL), linkedEntry(NULL) {}
 	microProgram* prog; // Program to which the entry point below is part of
 	void* x86ptrStart;  // Start of code (Entry point for block)
+	void* linkedEntry;  // Linked entry (skips cold setup)
 };
 
 struct alignas(16) microBlock
@@ -83,6 +84,7 @@ struct alignas(16) microBlock
 	microRegInfo    pState;      // Detailed State of Pipeline
 	microRegInfo    pStateEnd;   // Detailed State of Pipeline at End of Block (needed by JR/JALR opcodes)
 	u8*             x86ptrStart; // Start of code (Entry point for block)
+	u8*             linkedEntry; // Linked entry (skips cold setup, used by block linking)
 	microJumpCache* jumpCache;   // Will point to an array of entry points of size [16k/8] if block ends in JR/JALR
 };
 
