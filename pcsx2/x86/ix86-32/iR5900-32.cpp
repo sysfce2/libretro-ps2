@@ -1898,6 +1898,19 @@ StartRecomp:
 					break;
 				}
 			}
+			// shifts
+			else if (_Opcode_ == 0 && _Funct_ <= 007)
+			{
+				if (loads & 1 << _Rt_)
+					loads |= 1 << _Rd_;
+				else
+					reads |= 1 << _Rt_;
+				if (reads & 1 << _Rd_)
+				{
+					s_nBlockFF = false;
+					break;
+				}
+			}
 			// common register arithmetic instructions
 			else if (_Opcode_ == 0 && (_Funct_ & 060) == 040 && (_Funct_ & 076) != 050)
 			{
@@ -1917,13 +1930,9 @@ StartRecomp:
 			// loads
 			else if ((_Opcode_ & 070) == 040 || (_Opcode_ & 076) == 032 || _Opcode_ == 067)
 			{
-				if (loads & 1 << _Rs_)
-				{
-					loads |= 1 << _Rt_;
-					continue;
-				}
-				else
+				if (!(loads & 1 << _Rs_))
 					reads |= 1 << _Rs_;
+				loads |= 1 << _Rt_;
 				if (reads & 1 << _Rt_)
 				{
 					s_nBlockFF = false;
