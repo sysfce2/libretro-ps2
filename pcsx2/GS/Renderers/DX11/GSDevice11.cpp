@@ -431,6 +431,9 @@ void GSDevice11::EndPresent()
 {
 	// clear out the swap chain view, it might get resized..
 	OMSetRenderTargets(nullptr, nullptr, nullptr);
+
+	ResetAPIState();
+	RestoreAPIState();
 }
 
 void GSDevice11::DrawPrimitive()
@@ -655,6 +658,10 @@ void GSDevice11::PresentRect(GSTexture* sTex, const GSVector4& sRect, GSTexture*
 
 	ID3D11ShaderResourceView* srv = *(GSTexture11*)sTex;
 	m_ctx->PSSetShaderResources(0, 1, &srv);
+
+	/* Blanking enforce, see 'GSRenderer::VSync()' */
+	if (!sRect.right && !sRect.bottom)
+		ClearRenderTarget(sTex, 0);
 
 	extern retro_video_refresh_t video_cb;
 	video_cb(RETRO_HW_FRAME_BUFFER_VALID, sTex->GetWidth(), sTex->GetHeight(), 0);

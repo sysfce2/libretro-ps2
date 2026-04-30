@@ -26,6 +26,8 @@
 #include "../../../PerformanceMetrics.h"
 #include "../../../Config.h"
 
+extern retro_video_refresh_t video_cb;
+
 std::unique_ptr<GSRenderer> g_gs_renderer;
 
 GSRenderer::GSRenderer() { }
@@ -47,6 +49,16 @@ void GSRenderer::Destroy()
 
 void GSRenderer::PurgePool()
 {
+	// FIXME: PurgePool crashes d3d11+glcore
+	switch (g_gs_device->GetRenderAPI())
+	{
+		default:
+			break;
+		case RenderAPI::D3D11:
+		case RenderAPI::OpenGL:
+			return;
+	}
+
 	g_gs_device->PurgePool();
 }
 
@@ -289,44 +301,37 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 	}
 
 	const bool blank_frame = !Merge(field);
-	const bool is_d3d11    = (g_gs_device->GetRenderAPI() == RenderAPI::D3D11);
 
 	m_last_draw_n = s_n;
 	m_last_transfer_n = s_transfer_n;
 
 	if (skip_frame)
 	{
-		g_gs_device->ResetAPIState();
 		if (BeginPresentFrame(true))
 			g_gs_device->EndPresent();
 	}
 	else
 	{
-
 		if (!idle_frame)
 			g_gs_device->AgePool();
-
-		/* For D3D11 we call ResetAPIState a bit later or we'll get a black screen */
-		if (!is_d3d11)
-			g_gs_device->ResetAPIState();
 
 		if (BeginPresentFrame(false))
 		{
 			GSTexture* current = g_gs_device->GetCurrent();
-			if (current && !blank_frame)
+			if (current)
 			{
-				GSVector4 src_uv        = GSVector4(0, 0, 1, 1);
+				GSVector4 src_uv        = (blank_frame) ? GSVector4::zero() : GSVector4(0, 0, 1, 1);
 				GSVector4 draw_rect     = GSVector4(0, 0, current->GetWidth(), current->GetHeight());
 
 				g_gs_device->PresentRect(current, src_uv, nullptr, draw_rect);
 			}
+			else
+				video_cb(NULL, 0, 0, 0);
 
 			g_gs_device->EndPresent();
 		}
 	}
 
-	if (is_d3d11)
-		g_gs_device->RestoreAPIState();
 	PerformanceMetrics::Update(registers_written, fb_sprite_frame);
 }
 

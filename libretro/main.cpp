@@ -1686,14 +1686,6 @@ static bool libretro_select_hw_render(void)
 			log_cb(RETRO_LOG_WARN, "Software does not work with Vulkan. Using fallback...\n");
 			goto fallback;
 		}
-#ifdef _WIN32
-		/* FIXME: Force D3D12 instead of D3D11 until D3D11 works properly */
-		if (context_type == RETRO_HW_CONTEXT_D3D11 && libretro_set_hw_render(RETRO_HW_CONTEXT_D3D12))
-		{
-			log_cb(RETRO_LOG_WARN, "D3D11 is not working properly. Forcing D3D12...\n");
-			return true;
-		}
-#endif
 		if (context_type != RETRO_HW_CONTEXT_NONE && libretro_set_hw_render(context_type))
 			return true;
 #endif
