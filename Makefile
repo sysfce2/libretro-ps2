@@ -506,8 +506,7 @@ WARNINGS := -Wall \
 
 # MinGW + cmake's PCSX2 build also suppresses these
 ifeq ($(IS_WIN_MINGW),1)
-   WARNINGS += -Wno-class-memaccess \
-               -Wno-stringop-overflow \
+   WARNINGS += -Wno-stringop-overflow \
                -Wno-stringop-truncation \
                -Wno-maybe-uninitialized \
                -Wno-attributes \
@@ -520,6 +519,10 @@ ifeq ($(IS_WIN_MINGW),1)
                -Wno-missing-braces \
                -Wno-unknown-pragmas \
                -Wno-packed-not-aligned
+   # -Wno-class-memaccess is a C++-only diagnostic.  Putting it in the
+   # shared WARNINGS makes gcc emit a noisy 'valid for C++/ObjC++ but
+   # not for C' warning on every C TU, so keep it CXX-only.
+   CXX_WARNINGS += -Wno-class-memaccess
 endif
 
 ifeq ($(NO_GCC),1)
@@ -611,7 +614,7 @@ endif
 # superset, so the same flag works.  We disable RTTI/exceptions to match cmake.
 CXXFLAGS += -std=c++17 -fno-rtti -fno-exceptions
 CFLAGS   += -std=gnu99
-CXXFLAGS += $(FLAGS)
+CXXFLAGS += $(FLAGS) $(CXX_WARNINGS)
 CFLAGS   += $(FLAGS)
 
 ifneq ($(SANITIZER),)

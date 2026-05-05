@@ -10,6 +10,15 @@
 
 #include <windows.h>
 
+/* The Win32 'max' macro from <windef.h> is suppressed when consumers
+ * compile with -DNOMINMAX (which the libretro build does, to keep
+ * std::min / std::max usable in C++ code).  Provide a local fallback
+ * matching <windef.h>'s shape so this file builds either way without
+ * diverging from upstream's 'max(a, b)' style. */
+#ifndef max
+#define max(a, b) (((a) > (b)) ? (a) : (b))
+#endif
+
 #ifdef __GNUC__
   #define CPUINFO_ALLOCA __builtin_alloca
 #else

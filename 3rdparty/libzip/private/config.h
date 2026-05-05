@@ -24,8 +24,20 @@
 /* #undef HAVE_FICLONERANGE */
 #define HAVE_FILENO
 /* #undef HAVE_FCHMOD */
+/* MinGW exposes real fseeko/ftello functions when _FILE_OFFSET_BITS=64
+ * is set (which the libretro core build always does).  MSVC has
+ * neither.  Detect at compile time so libzip's compat.h doesn't try
+ * to redefine fseeko as a function-like macro -- which would corrupt
+ * mingw's <stdio.h> function prototype for fseeko further down the
+ * include chain.  We test '_WIN32 && !_MSC_VER' rather than __MINGW32__
+ * because some MSYS2 mingw64 gcc revisions don't define __MINGW32__. */
+#if defined(_WIN32) && !defined(_MSC_VER)
+#define HAVE_FSEEKO
+#define HAVE_FTELLO
+#else
 /* #undef HAVE_FSEEKO */
 /* #undef HAVE_FTELLO */
+#endif
 /* #undef HAVE_GETPROGNAME */
 /* #undef HAVE_GNUTLS */
 /* #undef HAVE_LIBBZ2 */
