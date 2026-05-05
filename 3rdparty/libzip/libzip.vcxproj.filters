@@ -5,14 +5,12 @@
     <ClCompile Include="libzip\lib\zip_unchange_archive.c" />
     <ClCompile Include="libzip\lib\zip_unchange_data.c" />
     <ClCompile Include="libzip\lib\zip_utf-8.c" />
-    <ClCompile Include="libzip\lib\zip_winzip_aes.c" />
     <ClCompile Include="libzip\lib\zip_add.c" />
     <ClCompile Include="libzip\lib\zip_add_dir.c" />
     <ClCompile Include="libzip\lib\zip_add_entry.c" />
     <ClCompile Include="libzip\lib\zip_algorithm_deflate.c" />
     <ClCompile Include="libzip\lib\zip_buffer.c" />
     <ClCompile Include="libzip\lib\zip_close.c" />
-    <ClCompile Include="libzip\lib\zip_crypto_win.c" />
     <ClCompile Include="libzip\lib\zip_delete.c" />
     <ClCompile Include="libzip\lib\zip_dir_add.c" />
     <ClCompile Include="libzip\lib\zip_dirent.c" />
@@ -108,8 +106,6 @@
     <ClCompile Include="libzip\lib\zip_source_tell.c" />
     <ClCompile Include="libzip\lib\zip_source_tell_write.c" />
     <ClCompile Include="libzip\lib\zip_source_window.c" />
-    <ClCompile Include="libzip\lib\zip_source_winzip_aes_decode.c" />
-    <ClCompile Include="libzip\lib\zip_source_winzip_aes_encode.c" />
     <ClCompile Include="libzip\lib\zip_source_write.c" />
     <ClCompile Include="libzip\lib\zip_source_zip.c" />
     <ClCompile Include="libzip\lib\zip_source_zip_new.c" />
@@ -127,7 +123,6 @@
     <ClInclude Include="libzip\lib\compat.h" />
     <ClInclude Include="libzip\lib\zip.h" />
     <ClInclude Include="libzip\lib\zip_crypto.h" />
-    <ClInclude Include="libzip\lib\zip_crypto_win.h" />
     <ClInclude Include="libzip\lib\zip_source_file.h" />
     <ClInclude Include="libzip\lib\zip_source_file_stdio.h" />
     <ClInclude Include="libzip\lib\zip_source_file_win32.h" />

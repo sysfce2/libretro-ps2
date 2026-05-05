@@ -416,23 +416,27 @@ SOURCES_CXX += \
 	$(GRANITE_DIR)/math/transforms.cpp
 
 # Granite util
+# cli_parser, dynamic_library, message_queue, timeline_trace_file are excluded:
+# their consumers (viewer/slangmosh tools, audio mixer, ffmpeg decode, thread group,
+# wsi_dxgi) are not built in the libretro core.
 SOURCES_CXX += \
 	$(GRANITE_DIR)/util/aligned_alloc.cpp \
 	$(GRANITE_DIR)/util/arena_allocator.cpp \
-	$(GRANITE_DIR)/util/cli_parser.cpp \
-	$(GRANITE_DIR)/util/dynamic_library.cpp \
 	$(GRANITE_DIR)/util/environment.cpp \
 	$(GRANITE_DIR)/util/logging.cpp \
-	$(GRANITE_DIR)/util/message_queue.cpp \
 	$(GRANITE_DIR)/util/slab_allocator.cpp \
 	$(GRANITE_DIR)/util/string_helpers.cpp \
 	$(GRANITE_DIR)/util/thread_id.cpp \
 	$(GRANITE_DIR)/util/thread_name.cpp \
 	$(GRANITE_DIR)/util/thread_priority.cpp \
-	$(GRANITE_DIR)/util/timeline_trace_file.cpp \
 	$(GRANITE_DIR)/util/timer.cpp
 
 # Granite vulkan
+# wsi.cpp and wsi_dxgi.cpp are excluded: the libretro core integrates with the
+# frontend's swapchain via retro_vulkan_* callbacks (pgs_create_device etc.)
+# and does not call any Vulkan::WSI methods. Excluding wsi.cpp also avoids the
+# vkAcquireFullScreenExclusiveModeEXT / vkGetPhysicalDeviceSurfacePresentModes2EXT
+# undefineds it pulls in.
 SOURCES_CXX += \
 	$(GRANITE_DIR)/vulkan/buffer.cpp \
 	$(GRANITE_DIR)/vulkan/buffer_pool.cpp \
@@ -441,7 +445,6 @@ SOURCES_CXX += \
 	$(GRANITE_DIR)/vulkan/context.cpp \
 	$(GRANITE_DIR)/vulkan/cookie.cpp \
 	$(GRANITE_DIR)/vulkan/descriptor_set.cpp \
-	$(GRANITE_DIR)/vulkan/device.cpp \
 	$(GRANITE_DIR)/vulkan/event_manager.cpp \
 	$(GRANITE_DIR)/vulkan/fence.cpp \
 	$(GRANITE_DIR)/vulkan/fence_manager.cpp \
@@ -455,10 +458,7 @@ SOURCES_CXX += \
 	$(GRANITE_DIR)/vulkan/sampler.cpp \
 	$(GRANITE_DIR)/vulkan/semaphore.cpp \
 	$(GRANITE_DIR)/vulkan/semaphore_manager.cpp \
-	$(GRANITE_DIR)/vulkan/shader.cpp \
-	$(GRANITE_DIR)/vulkan/texture/texture_format.cpp \
-	$(GRANITE_DIR)/vulkan/wsi.cpp \
-	$(GRANITE_DIR)/vulkan/wsi_dxgi.cpp
+	$(GRANITE_DIR)/vulkan/texture/texture_format.cpp
 
 # Granite volk (C, single TU)
 SOURCES_C += $(GRANITE_DIR)/third_party/volk/volk.c
@@ -628,8 +628,13 @@ SOURCES_CXX += \
 	$(DEPS_DIR)/rapidyaml/rapidyaml/ext/c4core/src/c4/memory_util.cpp \
 	$(DEPS_DIR)/rapidyaml/rapidyaml/ext/c4core/src/c4/utf.cpp
 
-# libzip - uses pre-generated zip_err_str.c and config.h from
-# 3rdparty/libzip/private/ (matches the upstream MSVC vcxproj path).
+# libzip - uses pre-generated zip_err_str.c and a hand-written portable
+# libzip_config.h (#ifdef _WIN32-aware) from 3rdparty/libzip/private/.
+# This common block holds files that build on every platform; the
+# Win-only and POSIX-only files are listed in the IS_WINDOWS ifeq below.
+# Keep this list in sync with LIBZIP_COMMON_SOURCES in
+# 3rdparty/libzip/CMakeLists.txt and the ClCompile list in
+# 3rdparty/libzip/libzip.vcxproj.
 SOURCES_C += \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_add.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_add_dir.c \
@@ -638,7 +643,6 @@ SOURCES_C += \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_algorithm_zstd.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_buffer.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_close.c \
-	$(DEPS_DIR)/libzip/libzip/lib/zip_crypto_win.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_delete.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_dirent.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_dir_add.c \
@@ -690,7 +694,6 @@ SOURCES_C += \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_open.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_pkware.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_progress.c \
-	$(DEPS_DIR)/libzip/libzip/lib/zip_random_win32.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_rename.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_replace.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_set_archive_comment.c \
@@ -711,11 +714,6 @@ SOURCES_C += \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_source_error.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_source_file_common.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_source_file_stdio.c \
-	$(DEPS_DIR)/libzip/libzip/lib/zip_source_file_win32.c \
-	$(DEPS_DIR)/libzip/libzip/lib/zip_source_file_win32_ansi.c \
-	$(DEPS_DIR)/libzip/libzip/lib/zip_source_file_win32_named.c \
-	$(DEPS_DIR)/libzip/libzip/lib/zip_source_file_win32_utf16.c \
-	$(DEPS_DIR)/libzip/libzip/lib/zip_source_file_win32_utf8.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_source_free.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_source_function.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_source_get_file_attributes.c \
@@ -734,8 +732,6 @@ SOURCES_C += \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_source_tell.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_source_tell_write.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_source_window.c \
-	$(DEPS_DIR)/libzip/libzip/lib/zip_source_winzip_aes_decode.c \
-	$(DEPS_DIR)/libzip/libzip/lib/zip_source_winzip_aes_encode.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_source_write.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_source_zip.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_source_zip_new.c \
@@ -749,8 +745,35 @@ SOURCES_C += \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_unchange_archive.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_unchange_data.c \
 	$(DEPS_DIR)/libzip/libzip/lib/zip_utf-8.c \
-	$(DEPS_DIR)/libzip/libzip/lib/zip_winzip_aes.c \
 	$(DEPS_DIR)/libzip/private/zip_err_str.c
+
+# libzip - platform-specific sources.  Mirrors the WIN32 branch in
+# 3rdparty/libzip/CMakeLists.txt: the *_win32 sources use Win32-only
+# APIs (CryptGenRandom, _wopen, etc.) and the unix sources reference
+# /dev/urandom and POSIX tempfile APIs.
+#
+# AES-encrypted-archive support is intentionally not built on either
+# platform -- pcsx2 never opens encrypted archives (CHD/cso/iso are
+# never WinZip-AES) so zip_winzip_aes.c, zip_source_winzip_aes_*.c,
+# and zip_crypto_win.c (the bcrypt-backed AES implementation) are
+# omitted.  This also means we don't need -lbcrypt on Windows.
+# zip_random_win32.c uses CryptGenRandom from <wincrypt.h> in advapi32,
+# linked by default on both MSVC and mingw, so no LIBS edit is needed.
+# Keep these two lists in sync with LIBZIP_PLATFORM_SOURCES in
+# 3rdparty/libzip/CMakeLists.txt.
+ifeq ($(IS_WINDOWS), 1)
+SOURCES_C += \
+	$(DEPS_DIR)/libzip/libzip/lib/zip_random_win32.c \
+	$(DEPS_DIR)/libzip/libzip/lib/zip_source_file_win32.c \
+	$(DEPS_DIR)/libzip/libzip/lib/zip_source_file_win32_ansi.c \
+	$(DEPS_DIR)/libzip/libzip/lib/zip_source_file_win32_named.c \
+	$(DEPS_DIR)/libzip/libzip/lib/zip_source_file_win32_utf16.c \
+	$(DEPS_DIR)/libzip/libzip/lib/zip_source_file_win32_utf8.c
+else
+SOURCES_C += \
+	$(DEPS_DIR)/libzip/libzip/lib/zip_random_unix.c \
+	$(DEPS_DIR)/libzip/libzip/lib/zip_source_file_stdio_named.c
+endif
 
 # D3D12MemAlloc (Windows only)
 ifeq ($(IS_WINDOWS), 1)
