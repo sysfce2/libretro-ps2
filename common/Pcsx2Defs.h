@@ -113,32 +113,43 @@
 
 // __forceinline / __fi: the codebase applies these to NON-static, NON-inline
 // function *definitions* in .cpp files, with `extern` declarations in headers.
-// gcc 15 at -O3 takes `__attribute__((always_inline, unused))` on such a
-// definition as license to inline at every callsite *and* not emit an
-// out-of-line copy, leaving cross-TU callers with undefined references
-// (e.g. dmaSIF1, vtlb_GetPhyPtr, x86Emitter::xPUSH...).  The cmake build
-// sidesteps this by enabling LTO/IPO on PCSX2_LTO so all .cpp's are merged
-// at link time, but the libretro-super static Makefile builds without LTO.
 //
-// We want `__fi` (the project's own decoration) to expand to nothing for
-// the libretro non-LTO build, so cross-TU calls remain linkable.  However
-// we MUST NOT clobber `__forceinline` itself: mingw-w64's system headers
-// (winbase.h / processthreadsapi.h / synchapi.h / _mingw.h ...) define
-// many functions like `strnlen_s`, `_InterlockedIncrement`, `NtCurrentTeb`
-// as `__forceinline ...`, relying on the GNU-inline semantics that
-// mingw assigns to `__forceinline` (extern __inline__ + always_inline +
-// gnu_inline) so that no out-of-line copy is emitted per TU.  If we
-// `#undef`/redefine `__forceinline` to empty globally, every system inline
-// becomes a regular definition in every TU that includes the header, and
-// the link explodes with `multiple definition of strnlen_s` etc.
+// MSVC, Linux gcc, and macOS clang all handle `__forceinline` correctly:
+// the always_inline attribute is applied at every callsite AND an out-of-line
+// copy is still emitted for the cross-TU callers.  On those toolchains the
+// historical decoration is what we want and yields the inlining gains the
+// hot paths (SPU2, vtlb, x86Emitter, dmaSIF...) were designed around.
 //
-// Solution: leave `__forceinline` alone (system headers continue to work),
-// and bind `__fi` / `__ri` / `__releaseinline` directly to empty here.
-// gcc -O3 still inlines same-TU callsites naturally.  LTO builds (cmake's
-// PCSX2_LTO=ON) inline cross-TU at link time, so there is no perf loss
-// where it matters.
+// mingw-w64 is the odd one out.  Its `_mingw.h` defines `__forceinline` as
+// `extern __inline__ __attribute__((__always_inline__,__gnu_inline__))`,
+// which under GNU inline rules means "inline at every callsite AND DO NOT
+// emit an out-of-line copy".  That last part breaks the libretro non-LTO
+// Makefile build: every cross-TU call (e.g. dmaSIF1, vtlb_GetPhyPtr,
+// x86Emitter::xPUSH, SPU2 Mix/TimeUpdate/spu2M_Write/UpdateSpdifMode...)
+// becomes an undefined reference.  cmake builds avoid this via PCSX2_LTO=ON
+// merging all TUs at link time, but the libretro Makefile builds do not LTO.
+//
+// We must NOT override `__forceinline` on mingw - the system headers
+// (winbase.h, processthreadsapi.h, synchapi.h, _mingw.h) declare and
+// define many functions like strnlen_s / _InterlockedIncrement /
+// NtCurrentTeb as `__forceinline ...` and rely on the gnu_inline
+// semantics for one-definition-rule compliance across TUs.  Redefining
+// `__forceinline` to empty there would cause "multiple definition of
+// strnlen_s" link errors.
+//
+// Instead, leave `__forceinline` alone everywhere, and bind the project's
+// `__fi` / `__ri` / `__releaseinline` decorations to empty ONLY on mingw.
+// On every other toolchain they keep their historical meaning of
+// `__forceinline`, preserving the inlining and the perf characteristics
+// that working PCSX2 builds depend on.
+#ifdef NDEBUG
 #ifndef __forceinline
-#define __forceinline
+#define __forceinline __attribute__((always_inline, unused))
+#endif
+#else
+#ifndef __forceinline
+#define __forceinline __attribute__((unused))
+#endif
 #endif
 
 #ifndef __noinline
@@ -170,14 +181,18 @@
 // from Devel builds is likely useful; but which should be inlined in an optimized Release
 // environment.
 //
-// __releaseinline / __ri / __fi expand to nothing in libretro non-LTO builds
-// (see the long comment by `__forceinline` above for rationale).  They are
-// bound directly here rather than via `__forceinline` so we do not disturb
-// the system definition of `__forceinline` that mingw-w64's headers rely on.
+// On mingw these expand to nothing; see the `__forceinline` comment block
+// above for the gnu_inline rationale.  Everywhere else they keep their
+// historical meaning of `__forceinline`.
+#ifdef __MINGW32__
 #define __releaseinline
-
 #define __ri
 #define __fi
+#else
+#define __releaseinline __forceinline
+#define __ri __releaseinline
+#define __fi __forceinline
+#endif
 
 // Makes sure that if anyone includes xbyak, it doesn't do anything bad
 #define XBYAK_ENABLE_OMITTED_OPERAND

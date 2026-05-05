@@ -54,7 +54,7 @@ static bool psxmode = false;
 
 // writes a signed value to the SPU2 ram
 // Invalidates the ADPCM cache in the process.
-void spu2M_Write(u32 addr, s16 value)
+__fi void spu2M_Write(u32 addr, s16 value)
 {
 	// Make sure the cache is invalidated:
 	// (note to self : addr address WORDs, not bytes)
@@ -186,7 +186,7 @@ void V_Core::Init(int index)
 /* TICKINTERVAL * SANITYINTERVAL = 3686400 */
 #define SAMPLECOUNT 3686400 
 
-void TimeUpdate(u32 cClocks)
+__fi void TimeUpdate(u32 cClocks)
 {
 	u32 dClocks = cClocks - lClocks;
 
@@ -413,7 +413,7 @@ void TimeUpdate(u32 cClocks)
 	}
 }
 
-void UpdateSpdifMode(void)
+__fi void UpdateSpdifMode(void)
 {
 	if (Spdif.Out & 0x4) // use 24/32bit PCM data streaming
 	{
