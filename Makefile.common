@@ -407,18 +407,19 @@ SOURCES_CXX += \
 	$(PGS_DIR)/gs/page_tracker.cpp
 
 # Granite math
+# aabb, frustum, interpolation, math, transforms are excluded: nm on the build
+# shows none of their defined symbols are referenced by anything we link in
+# (paraLLEl-GS does not use Granite's scene-graph / culling / colour helpers).
+# muglm is the only actually-used math TU.
 SOURCES_CXX += \
-	$(GRANITE_DIR)/math/aabb.cpp \
-	$(GRANITE_DIR)/math/frustum.cpp \
-	$(GRANITE_DIR)/math/interpolation.cpp \
-	$(GRANITE_DIR)/math/math.cpp \
-	$(GRANITE_DIR)/math/muglm/muglm.cpp \
-	$(GRANITE_DIR)/math/transforms.cpp
+	$(GRANITE_DIR)/math/muglm/muglm.cpp
 
 # Granite util
 # cli_parser, dynamic_library, message_queue are excluded: their consumers
 # (viewer/slangmosh tools, audio mixer, ffmpeg decode, thread group, wsi_dxgi)
 # are not built in the libretro core.
+# string_helpers and thread_priority are also excluded: nm shows none of their
+# defined symbols are referenced anywhere we link in.
 # timeline_trace_file is needed because Granite's vulkan/device.cpp calls
 # allocate_event/submit_event directly on system_handles.timeline_trace_file
 # (only the GRANITE_SCOPED_TIMELINE_EVENT macros are GRANITE_SHIPPING-gated).
@@ -428,10 +429,8 @@ SOURCES_CXX += \
 	$(GRANITE_DIR)/util/environment.cpp \
 	$(GRANITE_DIR)/util/logging.cpp \
 	$(GRANITE_DIR)/util/slab_allocator.cpp \
-	$(GRANITE_DIR)/util/string_helpers.cpp \
 	$(GRANITE_DIR)/util/thread_id.cpp \
 	$(GRANITE_DIR)/util/thread_name.cpp \
-	$(GRANITE_DIR)/util/thread_priority.cpp \
 	$(GRANITE_DIR)/util/timeline_trace_file.cpp \
 	$(GRANITE_DIR)/util/timer.cpp
 
@@ -441,6 +440,9 @@ SOURCES_CXX += \
 # and does not call any Vulkan::WSI methods. Excluding wsi.cpp also avoids the
 # vkAcquireFullScreenExclusiveModeEXT / vkGetPhysicalDeviceSurfacePresentModes2EXT
 # undefineds it pulls in.
+# pipeline_event is excluded: nm shows nothing references EventHolder /
+# EventHolderDeleter externally; paraLLEl-GS does not use Vulkan events for
+# inter-pass synchronisation.
 SOURCES_CXX += \
 	$(GRANITE_DIR)/vulkan/buffer.cpp \
 	$(GRANITE_DIR)/vulkan/buffer_pool.cpp \
@@ -457,7 +459,6 @@ SOURCES_CXX += \
 	$(GRANITE_DIR)/vulkan/indirect_layout.cpp \
 	$(GRANITE_DIR)/vulkan/memory_allocator.cpp \
 	$(GRANITE_DIR)/vulkan/pipeline_cache.cpp \
-	$(GRANITE_DIR)/vulkan/pipeline_event.cpp \
 	$(GRANITE_DIR)/vulkan/query_pool.cpp \
 	$(GRANITE_DIR)/vulkan/render_pass.cpp \
 	$(GRANITE_DIR)/vulkan/sampler.cpp \
