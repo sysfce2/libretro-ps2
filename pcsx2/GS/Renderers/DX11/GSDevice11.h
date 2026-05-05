@@ -40,20 +40,24 @@ public:
 
 	union OMBlendSelector
 	{
+		// gcc rejects 'anonymous struct member with non-trivial constructor'
+		// (ColorMaskSelector and BlendState both have user-defined ctors).
+		// Naming the struct sidesteps the C++ standard rule while leaving
+		// the bit layout (and the 'key' aliasing) identical.
 		struct
 		{
 			GSHWDrawConfig::ColorMaskSelector colormask;
 			u8 pad[3];
 			GSHWDrawConfig::BlendState blend;
-		};
+		} s;
 		u64 key;
 
 		OMBlendSelector() : key(0) { }
 		OMBlendSelector(GSHWDrawConfig::ColorMaskSelector colormask_, GSHWDrawConfig::BlendState blend_)
 		{
 			key = 0;
-			colormask = colormask_;
-			blend = blend_;
+			s.colormask = colormask_;
+			s.blend = blend_;
 		}
 	};
 

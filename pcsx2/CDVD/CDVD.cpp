@@ -752,7 +752,7 @@ void cdvdReset(void)
 		const std::time_t utc_time = std::time(nullptr);
 		const std::time_t gmt9_time = (utc_time + (60 * 60 * 9));
 		struct tm curtime = {};
-#ifdef _MSC_VER
+#ifdef _WIN32
 		gmtime_s(&curtime, &gmt9_time);
 #else
 		gmtime_r(&gmt9_time, &curtime);
