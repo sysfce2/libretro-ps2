@@ -23,7 +23,7 @@
 #include <type_traits>
 #include <utility>
 
-#ifdef _MSC_VER
+#if defined(_WIN32)
 #include <malloc.h>
 #endif
 
@@ -34,13 +34,16 @@
 	((void)(_aligned_free(ptr), (ptr) = NULL))
 
 // aligned_malloc: Implement/declare linux equivalents here!
-#if !defined(_MSC_VER)
-#if !defined(__MINGW32__)
+#if !defined(_WIN32)
 extern void* _aligned_malloc(size_t size, size_t align);
 extern void _aligned_free(void* pmem);
-#endif
 extern void* pcsx2_aligned_realloc(void* handle, size_t new_size, size_t align, size_t old_size);
 #else
+// Both MSVC and mingw-w64 provide _aligned_realloc via <malloc.h>; use it
+// directly so that no out-of-line pcsx2_aligned_realloc symbol is needed.
+// AlignedMalloc.cpp guards its definition with `#if !defined(_WIN32)`, so on
+// the libretro Windows build no out-of-line copy ever existed - prior to
+// this change the mingw-w64 path declared an `extern` it never resolved.
 #define pcsx2_aligned_realloc(handle, new_size, align, old_size) \
 	_aligned_realloc(handle, new_size, align)
 #endif
