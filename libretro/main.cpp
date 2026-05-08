@@ -419,11 +419,7 @@ static void check_variables(bool first_run)
 				s_settings_interface.SetUIntValue("EmuCore/GS", "pgsHighResScanout", setting_pgs_high_res_scanout);
 
 				retro_get_system_av_info(&av_info);
-#if 1
 				environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av_info);
-#else
-				environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &av_info.geometry);
-#endif
 				updated = true;
 			}
 		}
