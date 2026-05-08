@@ -169,7 +169,7 @@ struct GSRegSIGBLID
 };
 
 #define PS2MEM_GS g_RealGSMem
-#define PS2GS_BASE(mem) (PS2MEM_GS + (mem & 0x13ff))
+#define PS2GS_BASE(mem) (PS2MEM_GS + ((mem) & 0x13ff))
 
 #define CSRreg ((tGS_CSR&)*(PS2MEM_GS + 0x1000))
 
