@@ -262,7 +262,6 @@ void TAKES_R128 gsWrite128_page_01(u32 mem, r128 value)
 
 void TAKES_R128 gsWrite128_generic(u32 mem, r128 value)
 {
-	alignas(16) const u128 uvalue = r128_to_u128(value);
 	r128_store(PS2GS_BASE(mem), value);
 }
 

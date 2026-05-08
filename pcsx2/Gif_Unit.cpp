@@ -103,7 +103,7 @@ void Gif_HandlerAD_MTVU(u8* pMem)
 	}
 	else if (reg == GIF_A_D_REG_FINISH)
 	{ // FINISH
-		u32 old = vu1Thread.mtvuInterrupts.fetch_or(VU_Thread::InterruptFlagFinish, std::memory_order_relaxed);
+		vu1Thread.mtvuInterrupts.fetch_or(VU_Thread::InterruptFlagFinish, std::memory_order_relaxed);
 	}
 	else if (reg == GIF_A_D_REG_LABEL)
 	{ // LABEL

@@ -530,7 +530,12 @@ static void check_variables(bool first_run)
 		var.key = "pcsx2_upscale_multiplier";
 		if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
 		{
+			/* Used only by the #if 0 on-the-fly re-apply block below
+			 * (commented out pending the "crashes when changed live"
+			 * fix). The (void) cast silences -Wunused-variable while
+			 * the block is disabled, without dragging in C++17. */
 			int upscale_multiplier_prev = setting_upscale_multiplier;
+			(void)upscale_multiplier_prev;
 			setting_upscale_multiplier = atoi(var.value);
 
 			if (first_run)
