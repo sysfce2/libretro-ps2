@@ -400,7 +400,6 @@ static void _ext_memWrite64(u32 mem, mem64_t value)
 template<int p>
 static void TAKES_R128 _ext_memWrite128(u32 mem, r128 value)
 {
-	alignas(16) const u128 uvalue = r128_to_u128(value);
 	cpuTlbMiss(mem, cpuRegs.branch, EXC_CODE_TLBS);
 }
 

@@ -173,9 +173,7 @@ RETURNS_R128 readCache128(u32 mem)
 {
 	int way, idx;
 	void* addr = prepareCacheAccess<false, sizeof(mem128_t)>(mem, &way, &idx);
-	r128 value = r128_load(addr);
-	u64* vptr = reinterpret_cast<u64*>(&value);
-	return value;
+	return r128_load(addr);
 }
 
 template <typename Op>
