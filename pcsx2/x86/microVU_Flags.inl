@@ -330,7 +330,7 @@ static void _mVUflagPass(mV, u32 startPC, u32 sCount, u32 found, std::vector<u32
 		mVUregs.needExactMatch &= 7;
 		if (curI & _Ebit_)
 			branch = 1;
-		if ((curI & _Tbit_) || (curI & _Dbit_) && doDBitHandling)
+		if ((curI & _Tbit_) || ((curI & _Dbit_) && doDBitHandling))
 			branch = 6;
 		if (!(curI & _Ibit_))
 		{

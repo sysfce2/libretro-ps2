@@ -119,7 +119,10 @@ static __fi void ProcessIOPTag(void)
 	sif0.iop.counter = sif0words & 0xFFFFF;
 
 	// Save the number of words we need to write to make up 1QW from this packet. (See "Junk data writing" in Sif.h)
-	sif0.iop.writeJunk = (sif0.iop.counter & 0x3) ? (4 - sif0.iop.counter & 0x3) : 0;
+	// The two possible parses ('4 - (counter & 3)' vs '(4 - counter) & 3') happen to be
+	// algebraically equivalent here because counter & 3 is gated to [1..3], but the
+	// (4 - counter) & 3 form makes the round-up-to-4-words intent explicit.
+	sif0.iop.writeJunk = (sif0.iop.counter & 0x3) ? ((4 - sif0.iop.counter) & 0x3) : 0;
 	// IOP tags have an IRQ bit and an End of Transfer bit:
 	tDMA_TAG sif0dat_tmp;
 	sif0dat_tmp._u32 = sif0data;
