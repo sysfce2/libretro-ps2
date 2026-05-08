@@ -302,9 +302,12 @@ namespace Input
 		{ port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" }, \
 		{ port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Right Analog Y" }
 
+		/* Only ports 0 and 1 are actually polled in Update() and only
+		 * pads[0..1][0..3] are wired through PAD/SIO. Advertising 8
+		 * descriptor ports while polling 2 confuses the frontend's
+		 * input UI: ports 2-7 show up as bindable but never read. */
 		struct retro_input_descriptor desc[] = {
-			JOY_DESC(0), JOY_DESC(1), JOY_DESC(2), JOY_DESC(3),
-			JOY_DESC(4), JOY_DESC(5), JOY_DESC(6), JOY_DESC(7),
+			JOY_DESC(0), JOY_DESC(1),
 			{},
 		};
 
