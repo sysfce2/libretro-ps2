@@ -49,30 +49,6 @@
 extern std::unique_ptr<GSRendererPGS> g_pgs_renderer;
 #endif
 
-#if 0
-#define PERF_TEST
-#endif
-
-#ifdef PERF_TEST
-static struct retro_perf_callback perf_cb;
-
-#define RETRO_PERFORMANCE_INIT(name)                 \
-	retro_perf_tick_t current_ticks;                 \
-	static struct retro_perf_counter name = {#name}; \
-	if (!name.registered)                            \
-		perf_cb.perf_register(&(name));              \
-	current_ticks = name.total
-
-#define RETRO_PERFORMANCE_START(name) perf_cb.perf_start(&(name))
-#define RETRO_PERFORMANCE_STOP(name) \
-	perf_cb.perf_stop(&(name));      \
-	current_ticks = name.total - current_ticks;
-#else
-#define RETRO_PERFORMANCE_INIT(name)
-#define RETRO_PERFORMANCE_START(name)
-#define RETRO_PERFORMANCE_STOP(name)
-#endif
-
 retro_environment_t environ_cb;
 retro_video_refresh_t video_cb;
 retro_log_printf_t log_cb;
@@ -1303,9 +1279,6 @@ void retro_set_environment(retro_environment_t cb)
 
 	environ_cb = cb;
 	environ_cb(RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME, &no_game);
-#ifdef PERF_TEST
-	environ_cb(RETRO_ENVIRONMENT_GET_PERF_INTERFACE, &perf_cb);
-#endif
 
 	update_display_cb.callback = update_option_visibility;
 	environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_UPDATE_DISPLAY_CALLBACK, &update_display_cb);
@@ -1418,9 +1391,6 @@ void retro_deinit(void)
 	free_output_audio_buffer();
 	// WIN32 doesn't allow canceling threads from global constructors/destructors in a shared library.
 	vu1Thread.Close();
-#ifdef PERF_TEST
-	perf_cb.perf_log();
-#endif
 }
 
 void retro_get_system_info(retro_system_info* info)
@@ -2146,13 +2116,8 @@ void retro_run(void)
 	if (cpu_thread_state.load(std::memory_order_acquire) == VMState::Paused)
 		VMManager::SetState(VMState::Running);
 
-	RETRO_PERFORMANCE_INIT(pcsx2_run);
-	RETRO_PERFORMANCE_START(pcsx2_run);
-
 	MTGS::MainLoop(false);
 	upload_output_audio_buffer();
-
-	RETRO_PERFORMANCE_STOP(pcsx2_run);
 }
 
 std::optional<WindowInfo> Host::AcquireRenderWindow(void)
