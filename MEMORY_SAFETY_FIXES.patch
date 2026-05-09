@@ -2,99 +2,54 @@ diff --git a/pcsx2/Vif_HashBucket.h b/pcsx2/Vif_HashBucket.h
 index 56b649e..1234567 100644
 --- a/pcsx2/Vif_HashBucket.h
 +++ b/pcsx2/Vif_HashBucket.h
-@@ -73,10 +73,18 @@ public:
- 
+@@ -75,6 +75,10 @@ public:
  	__fi nVifBlock* find(const nVifBlock& dataPtr)
  	{
  		nVifBlock* chainpos = m_bucket[dataPtr.hash_key];
-+		
-+		// Prevent null pointer dereference
++
 +		if (chainpos == nullptr)
 +			return nullptr;
-+		
++
  		for (;;)
  		{
  			if (chainpos->key0 == dataPtr.key0 && chainpos->key1 == dataPtr.key1)
- 				return chainpos;
- 
- 			if (chainpos->startPtr == 0)
- 				return nullptr;
- 
-@@ -87,15 +95,25 @@ public:
- 
- 	void add(const nVifBlock& dataPtr)
- 	{
- 		u32 b = dataPtr.hash_key;
- 
- 		u32 size = bucket_size(dataPtr);
- 
+@@ -98,6 +102,14 @@ public:
  		// Warning there is an extra +1 due to the empty cell
  		// Performance note: 64B align to reduce cache miss penalty in `find`
--		m_bucket[b] = (nVifBlock*)pcsx2_aligned_realloc(m_bucket[b], sizeof(nVifBlock) * (size + 2), 64, sizeof(nVifBlock) * (size + 1));
-+		nVifBlock* new_bucket = (nVifBlock*)pcsx2_aligned_realloc(m_bucket[b], sizeof(nVifBlock) * (size + 2), 64, sizeof(nVifBlock) * (size + 1));
-+		
-+		// Check allocation success to prevent null pointer dereference
-+		if (new_bucket == nullptr)
+ 		m_bucket[b] = (nVifBlock*)pcsx2_aligned_realloc(m_bucket[b], sizeof(nVifBlock) * (size + 2), 64, sizeof(nVifBlock) * (size + 1));
++
++		if (m_bucket[b] == nullptr)
 +		{
 +			Console.Error("Vif_HashBucket: Failed to allocate memory for bucket");
 +			return;
 +		}
-+		
-+		m_bucket[b] = new_bucket;
++
  		// Replace the empty cell by the new block and create a new empty cell
  		memcpy(&m_bucket[b][size++], &dataPtr, sizeof(nVifBlock));
  		memset(&m_bucket[b][size], 0, sizeof(nVifBlock));
- 	}
- 
+@@ -106,6 +114,10 @@ public:
  	u32 bucket_size(const nVifBlock& dataPtr)
  	{
  		nVifBlock* chainpos = m_bucket[dataPtr.hash_key];
-+		
-+		// Prevent null pointer dereference
++
 +		if (chainpos == nullptr)
 +			return 0;
  
  		u32 size = 0;
  
- 		while (chainpos->startPtr != 0)
- 		{
- 			size++;
- 			chainpos++;
- 		}
- 
- 		return size;
- 	}
- 
- 	void clear()
- 	{
- 		int i;
- 		for (i = 0; i < HSIZE; i++)
- 		{
- 			if (m_bucket[i])
- 				safe_aligned_free(m_bucket[i]);
- 		}
- 	}
- 
- 	void reset()
- 	{
- 		int i;
- 		clear();
- 
- 		// Allocate an empty cell for all buckets
+@@ -135,6 +147,16 @@ public:
  		for (i = 0; i < HSIZE; i++)
  		{
  			m_bucket[i] = (nVifBlock*)_aligned_malloc(sizeof(nVifBlock), 16);
-+			
-+			// Check allocation success
++
 +			if (m_bucket[i] == nullptr)
 +			{
 +				Console.Error("Vif_HashBucket::reset: Failed to allocate memory");
-+				// Clear previously allocated buckets on failure
 +				for (int j = 0; j < i; j++)
 +					safe_aligned_free(m_bucket[j]);
 +				return;
 +			}
-+			
++
  			memset(m_bucket[i], 0, sizeof(nVifBlock));
  		}
  	}
@@ -102,17 +57,11 @@ diff --git a/pcsx2/IopBios.cpp b/pcsx2/IopBios.cpp
 index 28548d8..2345678 100644
 --- a/pcsx2/IopBios.cpp
 +++ b/pcsx2/IopBios.cpp
-@@ -410,18 +410,32 @@ namespace R3000A
- 	virtual int read(void* buf, bool iomanX) /* Flawfinder: ignore */
- 	{
- 		if (dir == results.end())
- 			return 0;
- 
+@@ -416,7 +416,18 @@ namespace R3000A
  		if (iomanX)
  		{
  			fxio_dirent_t* hostcontent = (fxio_dirent_t*)buf;
 -			strcpy(hostcontent->name, dir->FileName.c_str());
-+			// Use bounds-checked string copy instead of unsafe strcpy
 +			const size_t max_name_len = sizeof(hostcontent->name) - 1;
 +			const std::string& src_name = dir->FileName;
 +			if (src_name.length() > max_name_len)
@@ -128,10 +77,10 @@ index 28548d8..2345678 100644
  			host_stat(host_path(Path::Combine(basedir, dir->FileName), true), &hostcontent->stat);
  		}
  		else
+@@ -424,7 +435,18 @@ namespace R3000A
  		{
  			fio_dirent_t* hostcontent = (fio_dirent_t*)buf;
 -			strcpy(hostcontent->name, dir->FileName.c_str());
-+			// Use bounds-checked string copy instead of unsafe strcpy
 +			const size_t max_name_len = sizeof(hostcontent->name) - 1;
 +			const std::string& src_name = dir->FileName;
 +			if (src_name.length() > max_name_len)
@@ -146,36 +95,17 @@ index 28548d8..2345678 100644
 +			}
  			host_stat(host_path(Path::Combine(basedir, dir->FileName), true), &hostcontent->stat);
  		}
- 
- 		dir = std::next(dir);
- 		return 1;
- 	}
- 
- 	virtual void close()
- 	{
- 		delete this;
- 	}
 diff --git a/pcsx2/DEV9/ATA/ATA_Transfer.cpp b/pcsx2/DEV9/ATA/ATA_Transfer.cpp
 index c6cefcf..3456789 100644
 --- a/pcsx2/DEV9/ATA/ATA_Transfer.cpp
 +++ b/pcsx2/DEV9/ATA/ATA_Transfer.cpp
-@@ -326,6 +326,24 @@ bool ATA::IsAllZero(const void* data, size_t len)
- 
- void ATA::HDD_ReadAsync(void (ATA::*drqCMD)())
- {
- 	nsectorLeft = 0;
- 
- 	if (!HDD_CanAssessOrSetError())
- 		return;
- 
+@@ -334,11 +334,23 @@ void ATA::HDD_ReadAsync(void (ATA::*drqCMD)())
  	nsectorLeft = nsector;
  	if (readBufferLen < nsector * 512)
  	{
  		delete readBuffer;
 -		readBuffer = new u8[nsector * 512];
 -		readBufferLen = nsector * 512;
-+		
-+		// Safely allocate read buffer with OOM checking
 +		size_t new_size = nsector * 512;
 +		try
 +		{
@@ -191,50 +121,13 @@ index c6cefcf..3456789 100644
 +		}
  	}
  	waitingCmd = drqCMD;
- 
- 	{
- 		std::lock_guard ioSignallock(ioMutex);
- 		ioRead = true;
- 	}
- 	ioReady.notify_all();
- }
- 
- //Note, we don't expect both Async & Sync Reads
- //Do one of the other
- void ATA::HDD_ReadSync(void (ATA::*drqCMD)())
- {
- 	//unique_lock instead of lock_guard as also used for cv
- 	std::unique_lock ioWaitHandle(ioMutex);
- 	//Set ioWrite false to prevent reading & writing at the same time
- 	const bool ioWritePaused = ioWrite;
- 	ioWrite = false;
- 
- 	//wait until thread waiting
- 	ioThreadIdle_cv.wait(ioWaitHandle, [&] { return ioThreadIdle_bool; });
- 	ioWaitHandle.unlock();
- 
- 	nsectorLeft = 0;
- 
- 	if (!HDD_CanAssessOrSetError())
- 	{
- 		if (ioWritePaused)
- 		{
- 			ioWaitHandle.lock();
- 			ioWrite = true;
- 			ioWaitHandle.unlock();
- 			ioReady.notify_all();
- 		}
- 		return;
- 	}
- 
+@@ -378,11 +390,26 @@ void ATA::HDD_ReadSync(void (ATA::*drqCMD)())
  	nsectorLeft = nsector;
  	if (readBufferLen < nsector * 512)
  	{
  		delete[] readBuffer;
 -		readBuffer = new u8[nsector * 512];
 -		readBufferLen = nsector * 512;
-+		
-+		// Safely allocate read buffer with OOM checking
 +		size_t new_size = nsector * 512;
 +		try
 +		{
@@ -246,7 +139,6 @@ index c6cefcf..3456789 100644
 +			Console.Error("DEV9: ATA: Failed to allocate read buffer (%zu bytes)", new_size);
 +			readBuffer = nullptr;
 +			readBufferLen = 0;
-+			
 +			if (ioWritePaused)
 +			{
 +				ioWaitHandle.lock();
@@ -259,29 +151,11 @@ index c6cefcf..3456789 100644
  	}
  
  	IO_Read();
- 
- 	if (ioWritePaused)
- 	{
- 		ioWaitHandle.lock();
- 		ioWrite = true;
- 		ioWaitHandle.unlock();
- 		ioReady.notify_all();
- 	}
- 
- 	(this->*drqCMD)();
- }
 diff --git a/common/AlignedMalloc.h b/common/AlignedMalloc.h
 index ed7d43d..5678901 100644
 --- a/common/AlignedMalloc.h
 +++ b/common/AlignedMalloc.h
-@@ -40,6 +40,8 @@ extern void _aligned_free(void* pmem);
- #endif
- 
- // pcsx2_aligned_realloc differs from MSVCRT's _aligned_realloc in one
- // important way: callers (Vif_HashBucket::add) are allowed to change the
- // alignment between the original allocation and the realloc.  MSDN
- // explicitly says:
-@@ -52,12 +54,22 @@ extern void _aligned_free(void* pmem);
+@@ -52,6 +52,12 @@ extern void _aligned_free(void* pmem);
  // AlignedMalloc.cpp's #if !defined(_WIN32) guard left the symbol
  // undefined - the build only ever linked because the mingw pre-d2d1ebc
  // __forceinline behaviour kept the call inlined into a single site).
@@ -290,57 +164,29 @@ index ed7d43d..5678901 100644
 +// handle is NOT freed. Callers MUST check the return value and handle failure
 +// appropriately. New code should use std::unique_ptr with custom deleters for
 +// safer memory management.
++//
  static inline void* pcsx2_aligned_realloc(void* handle, size_t new_size, size_t align, size_t old_size)
  {
  	void* newbuf = _aligned_malloc(new_size, align);
- 
-+	// If allocation fails, return nullptr and leave original handle intact
-+	// This allows caller to decide whether to retry, fail, or use fallback
- 	if (newbuf != NULL && handle != NULL)
- 	{
- 		std::memcpy(newbuf, handle, old_size < new_size ? old_size : new_size);
- 		_aligned_free(handle);
- 	}
- 	return newbuf;
- }
 diff --git a/pcsx2/GS/Renderers/Common/GSFastList.h b/pcsx2/GS/Renderers/Common/GSFastList.h
 index 46d9e76..7890123 100644
 --- a/pcsx2/GS/Renderers/Common/GSFastList.h
 +++ b/pcsx2/GS/Renderers/Common/GSFastList.h
-@@ -70,11 +70,32 @@ public:
- 	void clear()
- 	{
- 		// Initialize m_capacity to 4 so we avoid to Grow() on initial insertions
- 		// The code doesn't break if this value is changed with anything from 1 to USHRT_MAX
- 		m_capacity = 4;
- 
+@@ -77,6 +77,19 @@ public:
  		// Initialize m_buffer and m_free_indexes_stack as a contiguous block of memory starting at m_buffer
  		// This should increase cache locality and reduce memory fragmentation
  		_aligned_free(m_buffer);
--		m_buffer = (Element<T>*)_aligned_malloc(m_capacity * sizeof(Element<T>) + (m_capacity - 1) * sizeof(u16), 64);
-+		
-+		// Safely allocate buffer with null check
-+		m_buffer = (Element<T>*)_aligned_malloc(m_capacity * sizeof(Element<T>) + (m_capacity - 1) * sizeof(u16), 64);
-+		
+ 		m_buffer = (Element<T>*)_aligned_malloc(m_capacity * sizeof(Element<T>) + (m_capacity - 1) * sizeof(u16), 64);
++
 +		if (m_buffer == nullptr)
 +		{
-+			// Allocation failed - set safe defaults
 +			Console.Error("GSFastList: Failed to allocate buffer in clear()");
 +			m_capacity = 0;
 +			m_free_indexes_stack = nullptr;
 +			m_free_indexes_stack_top = 0;
 +			return;
 +		}
-+		
++
  		m_free_indexes_stack = (u16*)&m_buffer[m_capacity];
  
  		// Initialize m_buffer[0], data field is unused but initialized using default T constructor
- 		m_buffer[0] = {T(), 0, 0};
- 
- 		// m_free_indexes_stack top index is 0, bottom index is m_capacity - 2
- 		m_free_indexes_stack_top = 0;
- 
- 		// m_buffer index 0 is reserved for auxiliary element
- 		for (u16 i = 0; i < m_capacity - 1; i++)
- 			m_free_indexes_stack[i] = i + 1;
- 	}
