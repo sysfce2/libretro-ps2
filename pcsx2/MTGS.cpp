@@ -232,7 +232,10 @@ void MTGS::MainLoop(bool flush_all)
 					break;
 				case GS_RINGTYPE_VSYNC:
 					// CSR & 0x2000; is the pageflip id.
-					if(!flush_all)
+					// flush_all skips GSvsync when multi-threaded (reset/pause drain
+					// without rendering), but in single-threaded mode MainLoop(true)
+					// IS the render path — call GSvsync.
+					if(!flush_all || std::this_thread::get_id() == s_thread)
 						GSvsync((((u32&)PS2MEM_GS[0x1000]) & 0x2000) ? 0 : 1, s_GSRegistersWritten);
 					s_GSRegistersWritten = false;
 
@@ -289,6 +292,11 @@ void MTGS::WaitGS(bool isMTVU)
 {
 	if(std::this_thread::get_id() == s_thread)
 	{
+		// Ensure MainLoop(true) doesn't bail immediately from
+		// CheckForWork() — entries may have been written without
+		// a prior NotifyOfWork (e.g. a frame with no completed
+		// GIF packets between PostVsyncStart and WaitGS).
+		s_sem_event.NotifyOfWork();
 		MainLoop(true);
 		return;
 	}
