@@ -14,6 +14,7 @@
  */
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <memory>
@@ -254,6 +255,122 @@ namespace
 			}
 		}
 	}
+
+	/* ====================================================================
+	 * Deinterlace helpers
+	 *
+	 * All three operate on full-frame GSTextureSW buffers. Source rect
+	 * for the deinterlacers is always (0,0,1,1) and destination rect
+	 * covers the destination texture (possibly shifted by a fractional
+	 * line for weave/bob's field offset, which we round to whole
+	 * pixels - the SW path doesn't have a way to do sub-pixel filtering
+	 * cheaply and the visual difference is one row of vertical jitter).
+	 * ==================================================================== */
+
+	/* WeaveCopy: take lines where (vpos & 1) == field from `src` and
+	 * write them to `dst` at the corresponding position. Lines that
+	 * don't match are left UNTOUCHED (they hold the previous frame's
+	 * field, providing the woven full-frame image). dst must have
+	 * had its previous-frame content preserved by ResizeRenderTarget
+	 * with preserve_contents=true. */
+	void WeaveCopy(
+		const u8* src, int src_pitch, int src_w, int src_h,
+		u8* dst, int dst_pitch, int dst_w, int dst_h,
+		int y_shift, int field)
+	{
+		const int copy_w = std::min(src_w, dst_w);
+		const int copy_h = std::min(src_h, dst_h);
+
+		for (int y = 0; y < copy_h; y++)
+		{
+			const int dy = y + y_shift;
+			if (dy < 0 || dy >= dst_h)
+				continue;
+			if ((dy & 1) != field)
+				continue;
+
+			std::memcpy(
+				dst + (size_t)dy * dst_pitch,
+				src + (size_t)y * src_pitch,
+				(size_t)copy_w * 4);
+		}
+	}
+
+	/* BobCopy: copy src into dst shifted vertically by y_shift,
+	 * filling unwritten rows with opaque black (no preservation -
+	 * unlike weave, bob is a clean per-field render). */
+	void BobCopy(
+		const u8* src, int src_pitch, int src_w, int src_h,
+		u8* dst, int dst_pitch, int dst_w, int dst_h,
+		int y_shift)
+	{
+		const int copy_w = std::min(src_w, dst_w);
+
+		/* Black-fill any destination rows we won't overwrite. With
+		 * y_shift=0..1 in normal cases this is at most one row at
+		 * top or bottom; with larger shifts more rows could be left
+		 * unwritten. Use the same opaque-black sentinel
+		 * 0xFF000000 to keep the field consistent. */
+		const int copy_start = std::max(0, y_shift);
+		const int copy_end   = std::min(dst_h, src_h + y_shift);
+
+		if (copy_start > 0)
+			ClearRectPx(dst, dst_pitch, dst_w, copy_start, 0xFF000000u);
+		if (copy_end < dst_h)
+			ClearRectPx(dst + (size_t)copy_end * dst_pitch, dst_pitch,
+				dst_w, dst_h - copy_end, 0xFF000000u);
+
+		for (int dy = copy_start; dy < copy_end; dy++)
+		{
+			const int sy = dy - y_shift;
+			std::memcpy(
+				dst + (size_t)dy * dst_pitch,
+				src + (size_t)sy * src_pitch,
+				(size_t)copy_w * 4);
+		}
+	}
+
+	/* BlendThree: each output row = (above + 2*center + below) / 4.
+	 * Source and destination are the same size; we read across rows
+	 * of `src` and write to corresponding rows of `dst`. Used as the
+	 * second pass of the Blend deinterlace mode, run on the output
+	 * of WeaveCopy. */
+	void BlendThree(
+		const u8* src, int src_pitch, int src_w, int src_h,
+		u8* dst, int dst_pitch, int dst_w, int dst_h)
+	{
+		const int copy_w = std::min(src_w, dst_w);
+		const int copy_h = std::min(src_h, dst_h);
+
+		for (int y = 0; y < copy_h; y++)
+		{
+			const int y_above = std::max(y - 1, 0);
+			const int y_below = std::min(y + 1, src_h - 1);
+
+			const u8* row_above = src + (size_t)y_above * src_pitch;
+			const u8* row_cent  = src + (size_t)y       * src_pitch;
+			const u8* row_below = src + (size_t)y_below * src_pitch;
+			u8* dst_row         = dst + (size_t)y       * dst_pitch;
+
+			for (int x = 0; x < copy_w; x++)
+			{
+				const u32 a = LoadPx(row_above, x);
+				const u32 c = LoadPx(row_cent,  x);
+				const u32 b = LoadPx(row_below, x);
+
+				const u32 ar = (a      ) & 0xFFu, ag = (a >>  8) & 0xFFu, ab = (a >> 16) & 0xFFu;
+				const u32 cr = (c      ) & 0xFFu, cg = (c >>  8) & 0xFFu, cb = (c >> 16) & 0xFFu;
+				const u32 br = (b      ) & 0xFFu, bg = (b >>  8) & 0xFFu, bb_ = (b >> 16) & 0xFFu;
+
+				/* (above + 2*center + below + 2) / 4, with rounding. */
+				const u32 r = (ar + cr * 2u + br  + 2u) >> 2;
+				const u32 g = (ag + cg * 2u + bg  + 2u) >> 2;
+				const u32 bl= (ab + cb * 2u + bb_ + 2u) >> 2;
+
+				StorePx(dst_row, x, (c & 0xFF000000u) | (bl << 16) | (g << 8) | r);
+			}
+		}
+	}
 } // anonymous namespace
 
 /* CPU-backed GSDownloadTexture. The SW renderer doesn't actually
@@ -429,10 +546,110 @@ void GSDeviceSW::DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex, 
 	}
 }
 
-void GSDeviceSW::DoInterlace(GSTexture* /*sTex*/, const GSVector4& /*sRect*/, GSTexture* /*dTex*/, const GSVector4& /*dRect*/,
-	ShaderInterlace /*shader*/, bool /*linear*/, const InterlaceConstantBuffer& /*cb*/)
+void GSDeviceSW::DoInterlace(GSTexture* sTex, const GSVector4& /*sRect*/, GSTexture* dTex, const GSVector4& dRect,
+	ShaderInterlace shader, bool /*linear*/, const InterlaceConstantBuffer& cb)
 {
-	/* Stage 3: implement weave/bob/blend/MAD/adaptive on CPU. */
+	if (!sTex || !dTex)
+		return;
+	GSTextureSW* src = static_cast<GSTextureSW*>(sTex);
+	GSTextureSW* dst = static_cast<GSTextureSW*>(dTex);
+	if (!src->GetPointer() || !dst->GetPointer())
+		return;
+
+	/* cb.ZrH layout from GSDevice::Interlace:
+	 *   x = bufIdx (passed as `field` for weave/blend, 0 for bob)
+	 *   y = 1.0 / dst_height (UV stride per line; unused here)
+	 *   z = dst_height
+	 *   w = MAD_SENSITIVITY (0.08; unused without MAD)
+	 * GSDevice::Interlace casts ZrH.x to int and uses (idx & 1) as
+	 * the field. */
+	const int field   = static_cast<int>(cb.ZrH.x) & 1;
+	const int y_shift = static_cast<int>(std::floor(dRect.y + 0.5f));
+
+	const int src_w   = src->GetWidth();
+	const int src_h   = src->GetHeight();
+	const int dst_w   = dst->GetWidth();
+	const int dst_h   = dst->GetHeight();
+	const int src_p   = src->GetPitch();
+	const int dst_p   = dst->GetPitch();
+	const u8* src_buf = src->GetPointer();
+	u8* dst_buf       = dst->GetPointer();
+
+	switch (shader)
+	{
+		case ShaderInterlace::WEAVE:
+			WeaveCopy(src_buf, src_p, src_w, src_h,
+				dst_buf, dst_p, dst_w, dst_h,
+				y_shift, field);
+			break;
+
+		case ShaderInterlace::BOB:
+			BobCopy(src_buf, src_p, src_w, src_h,
+				dst_buf, dst_p, dst_w, dst_h,
+				y_shift);
+			break;
+
+		case ShaderInterlace::BLEND:
+			/* GSDevice::Interlace mode 2 runs WEAVE -> dst, then
+			 * BLEND -> dst. Our BlendThree handles the second pass:
+			 * for each row of dst, average it with its vertical
+			 * neighbors. Source==dst in the second pass would
+			 * read-after-write; the base class actually allocates
+			 * a separate m_blend target and passes (m_weavebob ->
+			 * m_blend), so source and destination are distinct.
+			 * BlendThree assumes this and reads only from src. */
+			BlendThree(src_buf, src_p, src_w, src_h,
+				dst_buf, dst_p, dst_w, dst_h);
+			break;
+
+		case ShaderInterlace::MAD_BUFFER:
+		{
+			/* FastMAD (Motion Adaptive Deinterlacing): a faithful CPU
+			 * port needs the four-bank rotation buffer, per-pixel
+			 * motion detection across frames, and the weave-vs-
+			 * interpolate decision logic that the GPU shader spreads
+			 * across two passes. Until that lands, fail SOFT rather
+			 * than HARD: pass the merged content through verbatim,
+			 * so the visible result equals InterlaceMode=Off (mild
+			 * combing) rather than a black screen.
+			 *
+			 * This pass writes the source (m_merge, height H) into
+			 * the destination (m_mad, height 2H). Copy into the top
+			 * half so that MAD_RECONSTRUCT can read it back from a
+			 * known offset. */
+			const int copy_w = std::min(src_w, dst_w);
+			const int copy_h = std::min(src_h, dst_h);
+			for (int y = 0; y < copy_h; y++)
+			{
+				std::memcpy(
+					dst_buf + (size_t)y * dst_p,
+					src_buf + (size_t)y * src_p,
+					(size_t)copy_w * 4);
+			}
+			break;
+		}
+
+		case ShaderInterlace::MAD_RECONSTRUCT:
+		{
+			/* See MAD_BUFFER above. Read back the top half of m_mad
+			 * (which holds the verbatim m_merge content we just
+			 * stored) and write it into m_weavebob, the destination
+			 * GSRenderer::VSync will subsequently present. */
+			const int copy_w = std::min(src_w, dst_w);
+			const int copy_h = std::min(src_h, dst_h);
+			for (int y = 0; y < copy_h; y++)
+			{
+				std::memcpy(
+					dst_buf + (size_t)y * dst_p,
+					src_buf + (size_t)y * src_p,
+					(size_t)copy_w * 4);
+			}
+			break;
+		}
+
+		default:
+			break;
+	}
 }
 
 void GSDeviceSW::CopyRect(GSTexture* sTex, GSTexture* dTex, const GSVector4i& r, u32 destX, u32 destY)
