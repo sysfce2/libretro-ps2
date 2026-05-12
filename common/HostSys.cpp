@@ -486,13 +486,13 @@ std::unique_ptr<SharedMemoryMappingArea> SharedMemoryMappingArea::Create(size_t 
 		return nullptr;
 	if (reinterpret_cast<uintptr_t>(alloc) < 0x100000000ULL)
 	{
-		Console.Error("VirtualAlloc2 placed the fastmem region at %p, below the 4 GB "
-			"boundary - rejecting. The 4 GB span would overlap KUSER_SHARED_DATA "
-			"and other Windows system reservations, and the page-fault handler "
-			"cannot distinguish those faults from genuine fastmem misses. This "
-			"usually indicates a fragmented address space (custom CRT, antivirus "
-			"injection, unusual DLL load order). Continuing with fastmem disabled.",
-			alloc);
+		/* Bad placement - the 4 GB span would overlap KUSER_SHARED_DATA
+		 * and other Windows system reservations near 0x7FFE0000, and
+		 * the page-fault handler cannot distinguish those faults from
+		 * genuine fastmem misses (fastmem_end = fastmem_start +
+		 * 0xFFFFFFFF reaches well past 4 GB). Free it and let the
+		 * caller (vtlb_Core_Alloc) fall back to no-fastmem mode and
+		 * log the user-visible warning. */
 		VirtualFreeEx(GetCurrentProcess(), alloc, 0, MEM_RELEASE);
 		return nullptr;
 	}
