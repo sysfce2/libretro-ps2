@@ -13,7 +13,6 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <algorithm>
 #include "Global.h"
 
 #define ADSR_MAX_VOL 0x7fff
@@ -47,63 +46,4 @@ void ADSR_UpdateCache(V_ADSR &v)
 	v.CachedPhases[PHASE_RELEASE].Shift  = v.ReleaseShift;
 	v.CachedPhases[PHASE_RELEASE].Step   = -8;
 	v.CachedPhases[PHASE_RELEASE].Target = 0;
-}
-
-bool ADSR_Calculate(V_ADSR &v)
-{
-	/* v.Phase is by construction always in [PHASE_STOPPED .. PHASE_RELEASE]
-	 * (range 0..4), bounded by every site that writes to it: ADSR_Release
-	 * sets PHASE_RELEASE, the KeyOn path sets PHASE_ATTACK, the v.Phase++
-	 * below is gated by the PHASE_RELEASE termination check, and the
-	 * scattered PHASE_STOPPED/PHASE_SUSTAIN assignments are also in range.
-	 * Use unchecked indexing to skip the .at() bounds check on every call;
-	 * this function runs per-active-voice per-sample at 48 kHz. */
-	auto& p = v.CachedPhases[v.Phase];
-
-	// maybe not correct for the "infinite" settings
-	u32 counter_inc = 0x8000 >> std::max(0, p.Shift - 11);
-	s32 level_inc   = p.Step << std::max(0, 11 - p.Shift);
-
-	if (p.Exp)
-	{
-		if (p.Decr)
-			level_inc = (s16)((level_inc * v.Value) >> 15);
-		else
-		{
-			if (v.Value > 0x6000)
-				counter_inc >>= 2;
-		}
-	}
-
-	counter_inc = std::max<u32>(1, counter_inc);
-	v.Counter  += counter_inc;
-
-	if (v.Counter >= 0x8000)
-	{
-		v.Counter = 0;
-		v.Value   = std::clamp<s32>(v.Value + level_inc, 0, INT16_MAX);
-	}
-
-	// Stay in sustain until key off or silence
-	if (v.Phase == PHASE_SUSTAIN)
-		return v.Value != 0;
-
-	// Check if target is reached to advance phase
-	if ((!p.Decr && v.Value >= p.Target) || (p.Decr && v.Value <= p.Target))
-		v.Phase++;
-
-	// All phases done, stop the voice
-	if (v.Phase > PHASE_RELEASE)
-		return false;
-
-	return true;
-}
-
-void ADSR_Release(V_ADSR &v)
-{
-	if (v.Phase != PHASE_STOPPED)
-	{
-		v.Phase   = PHASE_RELEASE;
-		v.Counter = 0;
-	}
 }
