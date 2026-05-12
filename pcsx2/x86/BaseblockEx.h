@@ -50,7 +50,10 @@ class BaseBlockArray
 		BASEBLOCKEX* newMem = new BASEBLOCKEX[size];
 		if (blocks)
 		{
-			memcpy(newMem, blocks, _Reserved * sizeof(BASEBLOCKEX));
+			// Only _Size entries are live; the slots between _Size and
+			// _Reserved are uninitialized scratch and don't need copying.
+			// insert() zeroes new slots per-entry as it uses them.
+			memcpy(newMem, blocks, _Size * sizeof(BASEBLOCKEX));
 			delete[] blocks;
 		}
 		blocks = newMem;
