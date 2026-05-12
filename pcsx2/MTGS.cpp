@@ -235,8 +235,10 @@ void MTGS::MainLoop(bool flush_all)
 					// without rendering), but in single-threaded mode MainLoop(true)
 					// IS the render path — call GSvsync.
 					if(!flush_all || std::this_thread::get_id() == s_thread)
-						GSvsync((((u32&)PS2MEM_GS[0x1000]) & 0x2000) ? 0 : 1, s_GSRegistersWritten);
-					s_GSRegistersWritten = false;
+						GSvsync((((u32&)PS2MEM_GS[0x1000]) & 0x2000) ? 0 : 1,
+						        s_GSRegistersWritten.exchange(false, std::memory_order_acq_rel));
+					else
+						s_GSRegistersWritten.store(false, std::memory_order_release);
 					break;
 				case GS_RINGTYPE_FREEZE:
 					{

@@ -23,7 +23,7 @@
 #include "Config.h"
 
 alignas(16) u8 g_RealGSMem[Ps2MemSize::GSregs];
-bool s_GSRegistersWritten = false;
+std::atomic<bool> s_GSRegistersWritten{false};
 
 void gsSetVideoMode(GS_VideoMode mode)
 {
@@ -191,7 +191,8 @@ void gsWrite64_generic(u32 mem, u64 value)
 
 void gsWrite64_page_00(u32 mem, u64 value)
 {
-	s_GSRegistersWritten |= (mem == GS_DISPFB1 || mem == GS_DISPFB2 || mem == GS_PMODE);
+	if (mem == GS_DISPFB1 || mem == GS_DISPFB2 || mem == GS_PMODE)
+		s_GSRegistersWritten.store(true, std::memory_order_release);
 
 	if (mem == GS_SMODE1 || mem == GS_SMODE2)
 	{
