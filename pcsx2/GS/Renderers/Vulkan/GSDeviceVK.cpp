@@ -629,11 +629,14 @@ static void SafeDestroyDescriptorSetLayout(VkDevice dev, VkDescriptorSetLayout& 
 	void GSDeviceVK::DestroyCommandBuffers()
 	{
 		VkDevice m_device    = vk_init_info.device;
-		for (FrameResources& resources : m_frame_resources)
+		for (u32 i = 0; i < NUM_COMMAND_BUFFERS; i++)
 		{
-			for (auto& it : resources.cleanup_resources)
-				it();
-			resources.cleanup_resources.clear();
+			FrameResources& resources = m_frame_resources[i];
+
+			/* Drain any deferred destructions for this frame. The
+			 * caller (GSDeviceVK::Destroy) has already done a
+			 * WaitForGPUIdle, so it is safe to destroy these now. */
+			CommandBufferCompleted(i);
 
 			if (resources.fence != VK_NULL_HANDLE)
 			{
@@ -882,8 +885,30 @@ static void SafeDestroyDescriptorSetLayout(VkDevice dev, VkDescriptorSetLayout& 
 	{
 		FrameResources& resources = m_frame_resources[index];
 
-		for (auto& it : resources.cleanup_resources)
-			it();
+		for (const FrameResources::CleanupEntry& it : resources.cleanup_resources)
+		{
+			switch (it.kind)
+			{
+				case FrameResources::CleanupKind::Buffer:
+					vkDestroyBuffer(vk_init_info.device, (VkBuffer)it.h0, nullptr);
+					break;
+				case FrameResources::CleanupKind::BufferVMA:
+					vmaDestroyBuffer(m_allocator, (VkBuffer)it.h0, (VmaAllocation)it.h1);
+					break;
+				case FrameResources::CleanupKind::Framebuffer:
+					vkDestroyFramebuffer(vk_init_info.device, (VkFramebuffer)it.h0, nullptr);
+					break;
+				case FrameResources::CleanupKind::Image:
+					vkDestroyImage(vk_init_info.device, (VkImage)it.h0, nullptr);
+					break;
+				case FrameResources::CleanupKind::ImageVMA:
+					vmaDestroyImage(m_allocator, (VkImage)it.h0, (VmaAllocation)it.h1);
+					break;
+				case FrameResources::CleanupKind::ImageView:
+					vkDestroyImageView(vk_init_info.device, (VkImageView)it.h0, nullptr);
+					break;
+			}
+		}
 		resources.cleanup_resources.clear();
 	}
 
@@ -929,39 +954,43 @@ static void SafeDestroyDescriptorSetLayout(VkDevice dev, VkDescriptorSetLayout& 
 	void GSDeviceVK::DeferBufferDestruction(VkBuffer object)
 	{
 		FrameResources& resources = m_frame_resources[m_current_frame];
-		resources.cleanup_resources.push_back([this, object]() { vkDestroyBuffer(vk_init_info.device, object, nullptr); });
+		resources.cleanup_resources.push_back({
+			FrameResources::CleanupKind::Buffer, (u64)object, 0});
 	}
 
 	void GSDeviceVK::DeferBufferDestruction(VkBuffer object, VmaAllocation allocation)
 	{
 		FrameResources& resources = m_frame_resources[m_current_frame];
-		resources.cleanup_resources.push_back(
-			[this, object, allocation]() { vmaDestroyBuffer(m_allocator, object, allocation); });
+		resources.cleanup_resources.push_back({
+			FrameResources::CleanupKind::BufferVMA, (u64)object, (u64)allocation});
 	}
 
 	void GSDeviceVK::DeferFramebufferDestruction(VkFramebuffer object)
 	{
 		FrameResources& resources = m_frame_resources[m_current_frame];
-		resources.cleanup_resources.push_back([this, object]() { vkDestroyFramebuffer(vk_init_info.device, object, nullptr); });
+		resources.cleanup_resources.push_back({
+			FrameResources::CleanupKind::Framebuffer, (u64)object, 0});
 	}
 
 	void GSDeviceVK::DeferImageDestruction(VkImage object)
 	{
 		FrameResources& resources = m_frame_resources[m_current_frame];
-		resources.cleanup_resources.push_back([this, object]() { vkDestroyImage(vk_init_info.device, object, nullptr); });
+		resources.cleanup_resources.push_back({
+			FrameResources::CleanupKind::Image, (u64)object, 0});
 	}
 
 	void GSDeviceVK::DeferImageDestruction(VkImage object, VmaAllocation allocation)
 	{
 		FrameResources& resources = m_frame_resources[m_current_frame];
-		resources.cleanup_resources.push_back(
-			[this, object, allocation]() { vmaDestroyImage(m_allocator, object, allocation); });
+		resources.cleanup_resources.push_back({
+			FrameResources::CleanupKind::ImageVMA, (u64)object, (u64)allocation});
 	}
 
 	void GSDeviceVK::DeferImageViewDestruction(VkImageView object)
 	{
 		FrameResources& resources = m_frame_resources[m_current_frame];
-		resources.cleanup_resources.push_back([this, object]() { vkDestroyImageView(vk_init_info.device, object, nullptr); });
+		resources.cleanup_resources.push_back({
+			FrameResources::CleanupKind::ImageView, (u64)object, 0});
 	}
 
 	VkRenderPass GSDeviceVK::CreateCachedRenderPass(RenderPassCacheKey key)

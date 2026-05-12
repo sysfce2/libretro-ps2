@@ -235,7 +235,6 @@ public:
        void DeferImageDestruction(VkImage object);
        void DeferImageDestruction(VkImage object, VmaAllocation allocation);
        void DeferImageViewDestruction(VkImageView object);
-       void DeferSamplerDestruction(VkSampler sampler);
 
        // Wait for a fence to be completed.
        // Also invokes callbacks for completion.
@@ -297,7 +296,31 @@ private:
 	       u64 fence_counter = 0;
 	       bool init_buffer_used = false;
 
-	       std::vector<std::function<void()>> cleanup_resources;
+	       /* Cleanup queue: per-frame list of Vulkan resources to be
+		* destroyed once the GPU is done with this command buffer.
+		* Stored as POD entries (type tag + up to two handles) and
+		* dispatched via a switch in CommandBufferCompleted; avoids
+		* the per-push heap allocation that std::function<void()>
+		* incurs for non-SBO captures. */
+	       enum class CleanupKind : u8
+	       {
+		       Buffer,         /* vkDestroyBuffer */
+		       BufferVMA,      /* vmaDestroyBuffer */
+		       Framebuffer,    /* vkDestroyFramebuffer */
+		       Image,          /* vkDestroyImage */
+		       ImageVMA,       /* vmaDestroyImage */
+		       ImageView,      /* vkDestroyImageView */
+	       };
+	       struct CleanupEntry
+	       {
+		       CleanupKind kind;
+		       /* Two handle slots; meaning depends on `kind`.
+			* h0: VkBuffer / VkFramebuffer / VkImage / VkImageView.
+			* h1: VmaAllocation (only for BufferVMA / ImageVMA). */
+		       u64 h0;
+		       u64 h1;
+	       };
+	       std::vector<CleanupEntry> cleanup_resources;
        };
 
        VmaAllocator m_allocator = VK_NULL_HANDLE;
