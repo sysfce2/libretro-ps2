@@ -41,7 +41,11 @@ template<uint page> extern void hwWrite16 (u32 mem, u16 value);
 
 template<uint page> extern void hwWrite32 (u32 mem, mem32_t value);
 template<uint page> extern void hwWrite64 (u32 mem, mem64_t srcval);
+#if PCSX2_MINGW_R128_BY_PTR
+template<uint page> extern void hwWrite128(u32 mem, const r128* srcval);
+#else
 template<uint page> extern void TAKES_R128 hwWrite128(u32 mem, r128 srcval);
+#endif
 
 // --------------------------------------------------------------------------------------
 //  Hardware FIFOs (128 bit access only!)

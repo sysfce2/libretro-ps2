@@ -238,8 +238,14 @@ void gsWrite64_page_01(u32 mem, u64 value)
 //////////////////////////////////////////////////////////////////////////
 // GS Write 128 bit
 
+#if PCSX2_MINGW_R128_BY_PTR
+void gsWrite128_page_01(u32 mem, const r128* value_ptr)
+{
+	const r128 value = r128_load(value_ptr);
+#else
 void TAKES_R128 gsWrite128_page_01(u32 mem, r128 value)
 {
+#endif
 	tGS_CSR tmp;
 	tmp.FIFO = CSR_FIFO_EMPTY;
 	tmp.REV  = 0x1B;
@@ -257,13 +263,24 @@ void TAKES_R128 gsWrite128_page_01(u32 mem, r128 value)
 			return;
 	}
 
+#if PCSX2_MINGW_R128_BY_PTR
+	gsWrite128_generic( mem, value_ptr );
+#else
 	gsWrite128_generic( mem, value );
+#endif
 }
 
+#if PCSX2_MINGW_R128_BY_PTR
+void gsWrite128_generic(u32 mem, const r128* value_ptr)
+{
+	r128_store(PS2GS_BASE(mem), r128_load(value_ptr));
+}
+#else
 void TAKES_R128 gsWrite128_generic(u32 mem, r128 value)
 {
 	r128_store(PS2GS_BASE(mem), value);
 }
+#endif
 
 __fi u8 gsRead8(u32 mem)
 {

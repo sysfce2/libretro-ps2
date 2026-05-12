@@ -267,7 +267,11 @@ static void nullWrite8(u32 mem, mem8_t value)   { }
 static void nullWrite16(u32 mem, mem16_t value) { }
 static void nullWrite32(u32 mem, mem32_t value) { }
 static void nullWrite64(u32 mem, mem64_t value) { }
+#if PCSX2_MINGW_R128_BY_PTR
+static void nullWrite128(u32 mem, const r128* value) { (void)mem; (void)value; }
+#else
 static void TAKES_R128 nullWrite128(u32 mem, r128 value) { }
+#endif
 
 template<int p>
 static mem8_t _ext_memRead8 (u32 mem)
@@ -398,10 +402,18 @@ static void _ext_memWrite64(u32 mem, mem64_t value)
 }
 
 template<int p>
+#if PCSX2_MINGW_R128_BY_PTR
+static void _ext_memWrite128(u32 mem, const r128* value)
+{
+	(void)value;
+	cpuTlbMiss(mem, cpuRegs.branch, EXC_CODE_TLBS);
+}
+#else
 static void TAKES_R128 _ext_memWrite128(u32 mem, r128 value)
 {
 	cpuTlbMiss(mem, cpuRegs.branch, EXC_CODE_TLBS);
 }
+#endif
 
 #define vtlb_RegisterHandlerTempl1(nam,t) vtlb_RegisterHandler(nam##Read8<t>,nam##Read16<t>,nam##Read32<t>,nam##Read64<t>,nam##Read128<t>, \
 															   nam##Write8<t>,nam##Write16<t>,nam##Write32<t>,nam##Write64<t>,nam##Write128<t>)
@@ -546,8 +558,14 @@ static void vuMicroWrite64(u32 addr, mem64_t data)
 }
 
 template<int vunum>
+#if PCSX2_MINGW_R128_BY_PTR
+static void vuMicroWrite128(u32 addr, const r128* data_ptr)
+{
+	const r128 data = r128_load(data_ptr);
+#else
 static void TAKES_R128 vuMicroWrite128(u32 addr, r128 data)
 {
+#endif
 	VURegs* vu = vunum ?  &vuRegs[1] :  &vuRegs[0];
 	addr      &= vunum ? 0x3fff: 0xfff;
 
@@ -665,8 +683,15 @@ static void vuDataWrite64(u32 addr, mem64_t data)
 	*(u64*)&vu->Mem[addr] = data;
 }
 
-template<int vunum> static void TAKES_R128 vuDataWrite128(u32 addr, r128 data)
+template<int vunum>
+#if PCSX2_MINGW_R128_BY_PTR
+static void vuDataWrite128(u32 addr, const r128* data_ptr)
 {
+	const r128 data = r128_load(data_ptr);
+#else
+static void TAKES_R128 vuDataWrite128(u32 addr, r128 data)
+{
+#endif
 	VURegs* vu = vunum ?  &vuRegs[1] :  &vuRegs[0];
 	addr      &= vunum ? 0x3fff: 0xfff;
 	if (vunum && THREAD_VU1)

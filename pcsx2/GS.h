@@ -256,8 +256,13 @@ extern void gsWrite64_page_00(u32 mem, u64 value);
 extern void gsWrite64_page_01(u32 mem, u64 value);
 extern void gsWrite64_generic(u32 mem, u64 value);
 
+#if PCSX2_MINGW_R128_BY_PTR
+extern void gsWrite128_page_01(u32 mem, const r128* value);
+extern void gsWrite128_generic(u32 mem, const r128* value);
+#else
 extern void TAKES_R128 gsWrite128_page_01(u32 mem, r128 value);
 extern void TAKES_R128 gsWrite128_generic(u32 mem, r128 value);
+#endif
 
 extern u8 gsRead8(u32 mem);
 extern u16 gsRead16(u32 mem);

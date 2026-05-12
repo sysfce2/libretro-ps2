@@ -140,4 +140,8 @@ extern SysMainMemory& GetVmMemory();
 extern void memBindConditionalHandlers(void);
 
 static __fi void memRead128(u32 mem, mem128_t* out)        { r128_store(out, vtlb_memRead128(mem)); }
+#if PCSX2_MINGW_R128_BY_PTR
+static __fi void memWrite128(u32 mem, const mem128_t* val) { vtlb_memWrite128(mem, reinterpret_cast<const r128*>(val)); }
+#else
 static __fi void memWrite128(u32 mem, const mem128_t* val) { vtlb_memWrite128(mem, r128_load(val)); }
+#endif

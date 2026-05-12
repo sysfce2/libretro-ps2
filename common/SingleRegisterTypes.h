@@ -36,6 +36,21 @@ using r128 = __m128i;
 #define RETURNS_R128 r128 __vectorcall
 #define TAKES_R128 __vectorcall
 
+/* MinGW (GCC targeting Win64) silently drops __vectorcall, so an r128
+ * (__m128i) passed by-value falls back to the MS x64 ABI which passes
+ * 16-byte aggregates via a hidden pointer in the next integer register
+ * slot. The JIT emits xmm-arg call sites assuming __vectorcall semantics,
+ * which mismatches and produces a null-pointer deref in the handler. Work
+ * around this MinGW-only ABI mismatch by changing the 128-bit write
+ * handler ABI on MinGW only: take a const r128* instead of r128, and have
+ * the JIT spill to stack and pass the pointer. MSVC and SysV keep the
+ * original by-value calling convention unchanged. */
+#if defined(_WIN32) && !defined(_MSC_VER) && !defined(__clang__)
+#define PCSX2_MINGW_R128_BY_PTR 1
+#else
+#define PCSX2_MINGW_R128_BY_PTR 0
+#endif
+
 /* And since we can't stick them in structs, we get lots of static methods, yay! */
 __forceinline static r128 r128_load(const void* ptr)
 {

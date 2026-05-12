@@ -61,8 +61,20 @@ namespace vtlb_private
 		{
 			if (sz == 128)
 			{
+#if PCSX2_MINGW_R128_BY_PTR
+				// MinGW GCC silently drops __vectorcall and passes r128
+				// (16-byte aggregate) by-value via the MS x64 ABI's hidden
+				// pointer in rdx. To match that, spill the value to a 16-byte
+				// aligned scratch slot at [rsp] (within the dispatcher's
+				// shadow space on Win64, which we own at this call boundary)
+				// and pass that pointer in arg2reg.
+				xMOVAPS(ptr128[rsp], xRegisterSSE::GetInstance(value_reg));
+				_freeX86reg(arg2reg.Id);
+				xMOV(arg2reg, rsp);
+#else
 				_freeXMMreg(xRegisterSSE::GetArgRegister(1, 0).Id);
 				xMOVAPS(xRegisterSSE::GetArgRegister(1, 0), xRegisterSSE::GetInstance(value_reg));
+#endif
 			}
 			else if (xmm)
 			{
@@ -143,7 +155,13 @@ namespace vtlb_private
 				break;
 
 			case 128:
+#if PCSX2_MINGW_R128_BY_PTR
+				// Value was spilled to [rsp] by PrepRegs (see comment there).
+				xMOVAPS(xmm0, ptr128[rsp]);
+				xMOVAPS(ptr[arg1reg], xmm0);
+#else
 				xMOVAPS(ptr[arg1reg], xRegisterSSE::GetArgRegister(1, 0));
+#endif
 				break;
 		}
 	}
@@ -699,9 +717,17 @@ void vtlb_DynGenWrite_Const(u32 bits, bool xmm, u32 addr_const, int value_reg)
 		xMOV(arg1regd, paddr);
 		if (bits == 128)
 		{
+#if PCSX2_MINGW_R128_BY_PTR
+			// MinGW: spill to [rsp] and pass pointer in arg2reg. See
+			// DynGen_PrepRegs for rationale.
+			xMOVAPS(ptr128[rsp], xRegisterSSE(value_reg));
+			_freeX86reg(arg2reg.Id);
+			xMOV(arg2reg, rsp);
+#else
 			const xRegisterSSE argreg(xRegisterSSE::GetArgRegister(1, 0));
 			_freeXMMreg(argreg.Id);
 			xMOVAPS(argreg, xRegisterSSE(value_reg));
+#endif
 		}
 		else if (xmm)
 		{
@@ -826,9 +852,11 @@ void vtlb_DynBackpatchLoadStore(uptr code_address, u32 code_size, u32 guest_pc, 
 
 		if (size_in_bits == 128)
 		{
+#if !PCSX2_MINGW_R128_BY_PTR
 			const xRegisterSSE argreg(xRegisterSSE::GetArgRegister(1, 0));
 			if (data_register != argreg.Id)
 				xMOVAPS(argreg, xRegisterSSE(data_register));
+#endif
 		}
 		else
 		{

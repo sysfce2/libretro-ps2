@@ -251,8 +251,14 @@ void vtlb_memWrite(u32 addr, DataType data)
 	}
 }
 
+#if PCSX2_MINGW_R128_BY_PTR
+void vtlb_memWrite128(u32 mem, const r128* value_ptr)
+{
+	const r128 value = r128_load(value_ptr);
+#else
 void TAKES_R128 vtlb_memWrite128(u32 mem, r128 value)
 {
+#endif
 	auto vmv = vtlbdata.vmap[mem >> VTLB_PAGE_BITS];
 
 	if (!vmv.isHandler(mem))
@@ -273,7 +279,11 @@ void TAKES_R128 vtlb_memWrite128(u32 mem, r128 value)
 	{
 		//has to: translate, find function, call function
 		u32 paddr = vmv.assumeHandlerGetPAddr(mem);
+#if PCSX2_MINGW_R128_BY_PTR
+		vmv.assumeHandler<128, true>()(paddr, value_ptr);
+#else
 		vmv.assumeHandler<128, true>()(paddr, value);
+#endif
 	}
 }
 
@@ -425,7 +435,11 @@ static RETURNS_R128 vtlbUnmappedVReadLg(u32 addr) { vtlb_Miss(addr, 0); return r
 
 template <typename OperandType>
 static void vtlbUnmappedVWriteSm(u32 addr, OperandType data) { vtlb_Miss(addr, 1); }
+#if PCSX2_MINGW_R128_BY_PTR
+static void vtlbUnmappedVWriteLg(u32 addr, const r128* data) { vtlb_Miss(addr, 1); (void)data; }
+#else
 static void TAKES_R128 vtlbUnmappedVWriteLg(u32 addr, r128 data) { vtlb_Miss(addr, 1); }
+#endif
 
 template <typename OperandType>
 static OperandType vtlbUnmappedPReadSm(u32 addr) { return 0; }
@@ -433,7 +447,11 @@ static RETURNS_R128 vtlbUnmappedPReadLg(u32 addr) { return r128_zero(); }
 
 template <typename OperandType>
 static void vtlbUnmappedPWriteSm(u32 addr, OperandType data) { }
+#if PCSX2_MINGW_R128_BY_PTR
+static void vtlbUnmappedPWriteLg(u32 addr, const r128* data) { (void)addr; (void)data; }
+#else
 static void TAKES_R128 vtlbUnmappedPWriteLg(u32 addr, r128 data) { }
+#endif
 // clang-format on
 
 // --------------------------------------------------------------------------------------
@@ -452,7 +470,11 @@ static void vtlbDefaultPhyWrite8(u32 addr, mem8_t data) { }
 static void vtlbDefaultPhyWrite16(u32 addr, mem16_t data) { }
 static void vtlbDefaultPhyWrite32(u32 addr, mem32_t data) { }
 static void vtlbDefaultPhyWrite64(u32 addr, mem64_t data) { }
+#if PCSX2_MINGW_R128_BY_PTR
+static void vtlbDefaultPhyWrite128(u32 addr, const r128* data) { (void)addr; (void)data; }
+#else
 static void TAKES_R128 vtlbDefaultPhyWrite128(u32 addr, r128 data) { }
+#endif
 
 // ===========================================================================================
 //  VTLB Public API -- Init/Term/RegisterHandler stuff

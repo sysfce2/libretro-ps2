@@ -32,7 +32,11 @@ typedef  void vtlbMemW8FP(u32 addr,mem8_t data);
 typedef  void vtlbMemW16FP(u32 addr,mem16_t data);
 typedef  void vtlbMemW32FP(u32 addr,mem32_t data);
 typedef  void vtlbMemW64FP(u32 addr,mem64_t data);
+#if PCSX2_MINGW_R128_BY_PTR
+typedef  void vtlbMemW128FP(u32 addr, const r128* data);
+#else
 typedef  void TAKES_R128 vtlbMemW128FP(u32 addr,r128 data);
+#endif
 
 template <size_t Width, bool Write> struct vtlbMemFP;
 
@@ -94,7 +98,11 @@ extern RETURNS_R128 vtlb_memRead128(u32 mem);
 
 template< typename DataType >
 extern void vtlb_memWrite(u32 mem, DataType value);
+#if PCSX2_MINGW_R128_BY_PTR
+extern void vtlb_memWrite128(u32 mem, const r128* value);
+#else
 extern void TAKES_R128 vtlb_memWrite128(u32 mem, r128 value);
+#endif
 
 // "Safe" variants of vtlb, designed for external tools.
 // These routines only access the various RAM, and will not call handlers

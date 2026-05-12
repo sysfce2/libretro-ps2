@@ -643,8 +643,14 @@ InstantizeHwRead(0x0f);
 #define HELPSWITCH(m) (((m)>>4) & 0xff)
 
 template< uint page >
+#if PCSX2_MINGW_R128_BY_PTR
+void hwWrite128(u32 mem, const r128* srcval_ptr)
+{
+	const r128 srcval = r128_load(srcval_ptr);
+#else
 void TAKES_R128 hwWrite128(u32 mem, r128 srcval)
 {
+#endif
 	// FIFOs are the only "legal" 128 bit registers.  Handle them first.
 	// all other registers fall back on the 64-bit handler (and from there
 	// most of them fall back to the 32-bit handler).
@@ -777,13 +783,17 @@ void hwWrite32( u32 mem, u32 value )
 			// way to do that --air
 			// Current assumption is that 32-bit and 64-bit writes likely do 128-bit zero-filled
 			// writes (upper 96 bits are 0, lower 32 bits are effective).
-			u128 zerofill;
+			alignas(16) u128 zerofill;
 			zerofill._u32[0]                 = 0;
 			zerofill._u32[1]                 = 0;
 			zerofill.hi                      = 0;
 			zerofill._u32[(mem >> 2) & 0x03] = value;
 
+#if PCSX2_MINGW_R128_BY_PTR
+			hwWrite128<page>(mem & ~0x0f, reinterpret_cast<const r128*>(&zerofill));
+#else
 			hwWrite128<page>(mem & ~0x0f, r128_from_u128(zerofill));
+#endif
 		}
 		return;
 
@@ -973,12 +983,16 @@ void hwWrite64( u32 mem, u64 value )
 		case 0x06:
 		case 0x07:
 			{
-				u128 zerofill;
+				alignas(16) u128 zerofill;
 				zerofill._u32[0] = 0;
 				zerofill._u32[1] = 0;
 				zerofill.hi      = 0;
 				zerofill._u64[(mem >> 3) & 0x01] = value;
+#if PCSX2_MINGW_R128_BY_PTR
+				hwWrite128<page>(mem & ~0x0f, reinterpret_cast<const r128*>(&zerofill));
+#else
 				hwWrite128<page>(mem & ~0x0f, r128_from_u128(zerofill));
+#endif
 			}
 			break;
 
@@ -991,12 +1005,21 @@ void hwWrite64( u32 mem, u64 value )
 
 }
 
+#if PCSX2_MINGW_R128_BY_PTR
+#define InstantizeHwWrite(pageidx) \
+	template void hwWrite8<pageidx>(u32 mem, mem8_t value); \
+	template void hwWrite16<pageidx>(u32 mem, mem16_t value); \
+	template void hwWrite32<pageidx>(u32 mem, mem32_t value); \
+	template void hwWrite64<pageidx>(u32 mem, mem64_t value); \
+	template void hwWrite128<pageidx>(u32 mem, const r128* srcval);
+#else
 #define InstantizeHwWrite(pageidx) \
 	template void hwWrite8<pageidx>(u32 mem, mem8_t value); \
 	template void hwWrite16<pageidx>(u32 mem, mem16_t value); \
 	template void hwWrite32<pageidx>(u32 mem, mem32_t value); \
 	template void hwWrite64<pageidx>(u32 mem, mem64_t value); \
 	template void TAKES_R128 hwWrite128<pageidx>(u32 mem, r128 srcval);
+#endif
 
 InstantizeHwWrite(0x00);	InstantizeHwWrite(0x08);
 InstantizeHwWrite(0x01);	InstantizeHwWrite(0x09);
