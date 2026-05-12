@@ -752,9 +752,6 @@
     <ClCompile Include="SPU2\ADSR.cpp">
       <Filter>System\Ps2\SPU2</Filter>
     </ClCompile>
-    <ClCompile Include="SPU2\DplIIdecoder.cpp">
-      <Filter>System\Ps2\SPU2</Filter>
-    </ClCompile>
     <ClCompile Include="SPU2\ReadInput.cpp">
       <Filter>System\Ps2\SPU2</Filter>
     </ClCompile>

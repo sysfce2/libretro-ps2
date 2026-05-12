@@ -271,7 +271,6 @@ SOURCES_CXX += \
 SOURCES_CXX += \
 	$(LRPS2_DIR)/SPU2/ADSR.cpp \
 	$(LRPS2_DIR)/SPU2/Dma.cpp \
-	$(LRPS2_DIR)/SPU2/DplIIdecoder.cpp \
 	$(LRPS2_DIR)/SPU2/Mixer.cpp \
 	$(LRPS2_DIR)/SPU2/ReadInput.cpp \
 	$(LRPS2_DIR)/SPU2/RegTable.cpp \

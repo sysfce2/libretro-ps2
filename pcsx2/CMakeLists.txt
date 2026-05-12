@@ -221,7 +221,6 @@ set(pcsx2CDVDHeaders
 # SPU2 sources
 set(pcsx2SPU2Sources
 	SPU2/ADSR.cpp
-	SPU2/DplIIdecoder.cpp
 	SPU2/Dma.cpp
 	SPU2/Mixer.cpp
 	SPU2/spu2.cpp
