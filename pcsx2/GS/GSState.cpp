@@ -521,7 +521,7 @@ void GSState::GIFPackedRegHandlerSTQRGBAXYZF2(const GIFPackedReg* RESTRICT r, u3
 
 	while (r < r_end)
 	{
-		__builtin_prefetch(r + 6, 0, 3);
+		__prefetch_r(r + 6);
 
 		const GSVector4i st = GSVector4i::loadl(&r[0].U64[0]);
 		GSVector4i q = GSVector4i::loadl(&r[0].U64[1]);
@@ -568,7 +568,7 @@ void GSState::GIFPackedRegHandlerSTQRGBAXYZ2(const GIFPackedReg* RESTRICT r, u32
 
 	while (r < r_end)
 	{
-		__builtin_prefetch(r + 6, 0, 3);
+		__prefetch_r(r + 6);
 
 		const GSVector4i st = GSVector4i::loadl(&r[0].U64[0]);
 		GSVector4i q = GSVector4i::loadl(&r[0].U64[1]);

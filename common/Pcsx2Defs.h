@@ -75,6 +75,15 @@
 #define CALLBACK __stdcall
 #endif
 
+// Portable read-prefetch into L1.  GCC/Clang have __builtin_prefetch.
+// MSVC routes through <intrin.h>: _mm_prefetch on x86, __prefetch on ARM64.
+#include <intrin.h>
+#if defined(_M_ARM64)
+#define __prefetch_r(p) __prefetch((const void*)(p))
+#else
+#define __prefetch_r(p) _mm_prefetch((char const*)(p), _MM_HINT_T0)
+#endif
+
 #else
 
 // --------------------------------------------------------------------------------------
@@ -82,6 +91,9 @@
 // --------------------------------------------------------------------------------------
 
 #define __assume(cond) do { if (!(cond)) __builtin_unreachable(); } while(0)
+
+// Portable read-prefetch into L1.  See MSVC counterpart above.
+#define __prefetch_r(p) __builtin_prefetch((const void*)(p))
 
 // SysV ABI passes vector parameters through registers unconditionally.
 #ifndef _WIN32
