@@ -115,7 +115,7 @@ void VU_Thread::Close()
 		return;
 
 	m_shutdown_flag.store(true, std::memory_order_release);
-	semaEvent.NotifyOfWork();
+	semaEvent.NotifyOfWorkIfRunning();
 	m_thread.Join();
 }
 

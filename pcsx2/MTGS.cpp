@@ -405,7 +405,7 @@ void Gif_AddCompletedGSPacket(GS_Packet& _gsPack, GIF_PATH _path)
 	}
 	tag.data[2]                         = (int)_path;
 	MTGS::s_WritePos.store((writepos + 1) & RINGBUFFERMASK, std::memory_order_release);
-	MTGS::s_sem_event.NotifyOfWork();
+	MTGS::s_sem_event.NotifyOfWorkIfRunning();
 }
 
 void Gif_AddBlankGSPacket(u32 _size, GIF_PATH _path)
@@ -428,6 +428,6 @@ void Gif_AddBlankGSPacket(u32 _size, GIF_PATH _path)
 	tag.data[2]                 = (int)_path;
 
 	MTGS::s_WritePos.store((writepos + 1) & RINGBUFFERMASK, std::memory_order_release);
-	MTGS::s_sem_event.NotifyOfWork();
+	MTGS::s_sem_event.NotifyOfWorkIfRunning();
 }
 
