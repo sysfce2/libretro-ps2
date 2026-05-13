@@ -199,7 +199,11 @@ void MTGS::MainLoop(bool flush_all)
 
 		// note: s_ReadPos is intentionally not volatile, because it should only
 		// ever be modified by this thread.
-		while (s_ReadPos.load(std::memory_order_relaxed) != s_WritePos.load(std::memory_order_acquire))
+		// Snapshot s_WritePos once per batch to avoid re-acquiring the EE's
+		// cache line on every packet.  New packets added during processing
+		// are picked up on the next outer-loop iteration.
+		const unsigned int snapshot_WritePos = s_WritePos.load(std::memory_order_acquire);
+		while (s_ReadPos.load(std::memory_order_relaxed) != snapshot_WritePos)
 		{
 			const unsigned int local_ReadPos = s_ReadPos.load(std::memory_order_relaxed);
 			const PacketTagType& tag = (PacketTagType&)m_Ring[local_ReadPos];
