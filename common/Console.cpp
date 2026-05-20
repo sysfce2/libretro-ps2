@@ -18,146 +18,46 @@
 #include "StringUtil.h"
 
 extern retro_log_printf_t log_cb;
-#include <mutex>
-static ConsoleColors log_color = Color_Default;
-static std::recursive_mutex log_mtx;
 
-static void RetroLog_DoSetColor(ConsoleColors color)
+static void DoLog(retro_log_level level, const char* fmt, va_list args)
 {
-	if (color != Color_Current)
-	{
-		std::lock_guard<std::recursive_mutex> lk(log_mtx);
-		log_color = color;
-	}
-}
-
-static void RetroLog_DoWrite(const char* fmt)
-{
-	retro_log_level level = RETRO_LOG_INFO;
-	ConsoleColors color;
-	{
-		std::lock_guard<std::recursive_mutex> lk(log_mtx);
-		color = log_color;
-	}
-	switch (color)
-	{
-		case Color_StrongRed: /* intended for errors */
-			level = RETRO_LOG_ERROR;
-			break;
-		case Color_StrongOrange: /* intended for warnings */
-			level = RETRO_LOG_WARN;
-			break;
-		case Color_Cyan:   /* faint visibility, intended for logging PS2/IOP output */
-		case Color_Yellow: /* faint visibility, intended for logging PS2/IOP output */
-		case Color_White:  /* faint visibility, intended for logging PS2/IOP output */
-			level = RETRO_LOG_DEBUG;
-			break;
-		default:
-		case Color_Default:
-		case Color_Black:
-		case Color_Green:
-		case Color_Red:
-		case Color_Blue:
-		case Color_Magenta:
-		case Color_Orange:
-		case Color_Gray:
-		case Color_StrongBlack:
-		case Color_StrongGreen: /* intended for infrequent state information */
-		case Color_StrongBlue:  /* intended for block headings */
-		case Color_StrongMagenta:
-		case Color_StrongGray:
-		case Color_StrongCyan:
-		case Color_StrongYellow:
-		case Color_StrongWhite:
-			break;
-	}
-
-	log_cb(level, "%s\n", fmt);
-}
-
-static void RetroLog_Newline(void)
-{
-	RetroLog_DoWrite("\n");
-}
-
-static void RetroLog_DoWriteLn(const char* fmt)
-{
-    RetroLog_DoWrite(fmt);
-}
-
-static const IConsoleWriter ConsoleWriter_Libretro =
-{
-	RetroLog_DoWrite,
-	RetroLog_DoWriteLn,
-	RetroLog_DoSetColor,
-	RetroLog_Newline,
-};
-
-bool IConsoleWriter::FormatV(const char* fmt, va_list args) const
-{
-	DoWriteLn(StringUtil::StdStringFromFormatV(fmt, args).c_str());
-	return false;
+	log_cb(level, "%s\n", StringUtil::StdStringFromFormatV(fmt, args).c_str());
 }
 
 bool IConsoleWriter::WriteLn(const char* fmt, ...) const
 {
 	va_list args;
-
 	va_start(args, fmt);
-	Console.DoSetColor(Color_Default);
-	FormatV(fmt, args);
+	DoLog(RETRO_LOG_INFO, fmt, args);
 	va_end(args);
-
-	return false;
-}
-
-bool IConsoleWriter::WriteLn(ConsoleColors color, const char* fmt, ...) const
-{
-	va_list args;
-
-	va_start(args, fmt);
-	Console.DoSetColor(color);
-	FormatV(fmt, args);
-	va_end(args);
-
 	return false;
 }
 
 bool IConsoleWriter::Error(const char* fmt, ...) const
 {
 	va_list args;
-
 	va_start(args, fmt);
-	Console.DoSetColor(Color_StrongRed);
-	FormatV(fmt, args);
+	DoLog(RETRO_LOG_ERROR, fmt, args);
 	va_end(args);
-
 	return false;
 }
 
 bool IConsoleWriter::Warning(const char* fmt, ...) const
 {
 	va_list args;
-
 	va_start(args, fmt);
-	Console.DoSetColor(Color_StrongOrange);
-	FormatV(fmt, args);
+	DoLog(RETRO_LOG_WARN, fmt, args);
 	va_end(args);
-
 	return false;
 }
 
 bool IConsoleWriter::Debug(const char* fmt, ...) const
 {
 	va_list args;
-
 	va_start(args, fmt);
-	Console.DoSetColor(Color_Yellow);
-	FormatV(fmt, args);
+	DoLog(RETRO_LOG_DEBUG, fmt, args);
 	va_end(args);
-
 	return false;
 }
 
-IConsoleWriter Console = ConsoleWriter_Libretro;
-const IConsoleWriter* PatchesCon = &ConsoleWriter_Libretro;
+IConsoleWriter Console;

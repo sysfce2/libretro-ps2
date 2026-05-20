@@ -17,80 +17,24 @@
 
 #include "Pcsx2Defs.h"
 
-#include <stdarg.h>
-
-enum ConsoleColors
-{
-	Color_Current = -1,
-
-	Color_Default = 0,
-
-	Color_Black,
-	Color_Green,
-	Color_Red,
-	Color_Blue,
-	Color_Magenta,
-	Color_Orange,
-	Color_Gray,
-
-	Color_Cyan, // faint visibility, intended for logging PS2/IOP output
-	Color_Yellow, // faint visibility, intended for logging PS2/IOP output
-	Color_White, // faint visibility, intended for logging PS2/IOP output
-
-	// Strong text *may* result in mis-aligned text in the console, depending on the
-	// font and the platform, so use these with caution.
-	Color_StrongBlack,
-	Color_StrongRed, // intended for errors
-	Color_StrongGreen, // intended for infrequent state information
-	Color_StrongBlue, // intended for block headings
-	Color_StrongMagenta,
-	Color_StrongOrange, // intended for warnings
-	Color_StrongGray,
-
-	Color_StrongCyan,
-	Color_StrongYellow,
-	Color_StrongWhite,
-
-	ConsoleColors_Count
-};
-
-static const ConsoleColors DefaultConsoleColor = Color_Default;
-
-
 // ----------------------------------------------------------------------------------------
-//  IConsoleWriter -- For printing messages to the console.
+//  IConsoleWriter -- For printing messages to the libretro log.
 // ----------------------------------------------------------------------------------------
-// General ConsoleWrite Threading Guideline:
-//   PCSX2 is a threaded environment and multiple threads can write to the console asynchronously.
-//   Individual calls to ConsoleWriter APIs will be written in atomic fashion, however "partial"
-//   logs may end up interrupted by logs on other threads.  This is usually not a problem for
-//   WriteLn, but may be undesirable for typical uses of Write.  In cases where you want to
-//   print multi-line blocks of uninterrupted logs, compound the entire log into a single large
-//   string and issue that to WriteLn.
+// PCSX2 is a threaded environment and multiple threads can write to the log
+// asynchronously. Individual calls are written atomically by the underlying
+// retro_log_callback, but a multi-line block may be interrupted by logs from
+// other threads; compound such blocks into a single string before issuing them.
 //
+// Each method maps to a fixed retro_log_level:
+//   WriteLn  -> RETRO_LOG_INFO
+//   Error    -> RETRO_LOG_ERROR
+//   Warning  -> RETRO_LOG_WARN
+//   Debug    -> RETRO_LOG_DEBUG
+//
+// All functions return false so logs can be disabled at compile time with the
+// "0 && Console.WriteLn(...)" trick.
 struct IConsoleWriter
 {
-	// A direct console write, without tabbing or newlines.  Useful to devs who want to do quick
-	// logging of various junk; but should *not* be used in production code due.
-	void(* WriteRaw)(const char* fmt);
-
-	// WriteLn implementation for internal use only.  Bypasses tabbing, prefixing, and other
-	// formatting.
-	void(* DoWriteLn)(const char* fmt);
-
-	// SetColor implementation for internal use only.
-	void(* DoSetColor)(ConsoleColors color);
-
-	void(* Newline)();
-
-	// ----------------------------------------------------------------------------
-	// Public members; call these to print stuff to console!
-	//
-	// All functions always return false.  Return value is provided only so that we can easily
-	// disable logs at compile time using the "0&&action" macro trick.
-
-	bool FormatV(const char* fmt, va_list args) const;
-	bool WriteLn(ConsoleColors color, const char* fmt, ...) const;
 	bool WriteLn(const char* fmt, ...) const;
 	bool Error(const char* fmt, ...) const;
 	bool Warning(const char* fmt, ...) const;
