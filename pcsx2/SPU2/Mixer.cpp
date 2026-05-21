@@ -61,10 +61,13 @@ static void __forceinline IncrementNextA(V_Voice& vc)
 	/* Important!  Both cores signal IRQ when an address is read, 
 	 * regardless of which core actually reads the address. */
 
-	for (int i = 0; i < 2; i++)
+	if (has_irq_armed)
 	{
-		if (Cores[i].IRQEnable && (vc.NextA == Cores[i].IRQA))
-			has_to_call_irq[i] = true;
+		for (int i = 0; i < 2; i++)
+		{
+			if (Cores[i].IRQEnable && (vc.NextA == Cores[i].IRQA))
+				has_to_call_irq[i] = true;
+		}
 	}
 
 	vc.NextA++;
@@ -114,9 +117,10 @@ static __forceinline s32 GetNextDataBuffered(V_Core& thiscore, V_Voice& vc, uint
 
 		// We'll need the loop flags and buffer pointers regardless of cache status:
 
-		for (int i = 0; i < 2; i++)
-			if (Cores[i].IRQEnable && Cores[i].IRQA == (vc.NextA & 0xFFFF8))
-				has_to_call_irq[i] = true;
+		if (has_irq_armed)
+			for (int i = 0; i < 2; i++)
+				if (Cores[i].IRQEnable && Cores[i].IRQA == (vc.NextA & 0xFFFF8))
+					has_to_call_irq[i] = true;
 
 		s16* memptr = GetMemPtr(vc.NextA & 0xFFFF8);
 		vc.LoopFlags = *memptr >> 8; // grab loop flags from the upper byte.
@@ -170,9 +174,10 @@ static __forceinline void GetNextDataDummy(V_Core& thiscore, V_Voice& vc, uint v
 
 	if (vc.SCurrent == 28)
 	{
-		for (int i = 0; i < 2; i++)
-			if (Cores[i].IRQEnable && Cores[i].IRQA == (vc.NextA & 0xFFFF8))
-				has_to_call_irq[i] = true;
+		if (has_irq_armed)
+			for (int i = 0; i < 2; i++)
+				if (Cores[i].IRQEnable && Cores[i].IRQA == (vc.NextA & 0xFFFF8))
+					has_to_call_irq[i] = true;
 
 		vc.LoopFlags = *GetMemPtr(vc.NextA & 0xFFFF8) >> 8; // grab loop flags from the upper byte.
 
@@ -275,10 +280,13 @@ static __forceinline void UpdateNoise(V_Core& thiscore)
  * of the SPU2 (between 0x0000 and SPU2_DYN_MEMLINE) */
 static __forceinline void spu2M_WriteFast(u32 addr, s16 value)
 {
-	for (int i = 0; i < 2; i++)
+	if (has_irq_armed)
 	{
-		if (Cores[i].IRQEnable && Cores[i].IRQA == addr)
-			has_to_call_irq[i] = true;
+		for (int i = 0; i < 2; i++)
+		{
+			if (Cores[i].IRQEnable && Cores[i].IRQA == addr)
+				has_to_call_irq[i] = true;
+		}
 	}
 	*GetMemPtr(addr) = value;
 }

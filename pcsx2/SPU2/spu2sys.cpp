@@ -48,6 +48,7 @@ int PlayMode;
 
 bool has_to_call_irq[2]     = { false, false };
 bool has_to_call_irq_dma[2] = { false, false };
+bool has_irq_armed          = false;
 StereoOut32 (*ReverbUpsample)(V_Core& core);
 s32 (*ReverbDownsample)(V_Core& core, bool right);
 
@@ -220,6 +221,12 @@ __fi void TimeUpdate(u32 cClocks)
 	int       max_pairs = dClocks / TICKINTERVAL;
 	int16_t  *snd_buffer = retro_audio_reserve(max_pairs * 2);
 	int       snd_count  = 0;
+
+	/* Stable for the whole batch: register writes (which set IRQEnable)
+	 * are flushed through TimeUpdate before they apply, so no write lands
+	 * mid-loop. Lets the sample hot path skip IRQA matching when neither
+	 * core is armed (the common case). */
+	has_irq_armed = Cores[0].IRQEnable || Cores[1].IRQEnable;
 
 	//Update Mixing Progress
 	while (dClocks >= TICKINTERVAL)

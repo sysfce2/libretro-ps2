@@ -489,6 +489,14 @@ extern s32 (*ReverbDownsample)(V_Core& core, bool right);
 extern bool has_to_call_irq[2];
 extern bool has_to_call_irq_dma[2];
 
+/* True while either core has its SPU IRQ enabled. Recomputed once per
+ * TimeUpdate batch (IRQEnable is stable across a batch, since register
+ * writes are flushed through TimeUpdate before they take effect). When
+ * false, the per-address IRQA comparisons scattered through the sample
+ * hot path are skipped wholesale: with no core armed none of them could
+ * ever set has_to_call_irq, so the result is unchanged. */
+extern bool has_irq_armed;
+
 namespace SPU2Savestate
 {
 	struct DataBlock;
