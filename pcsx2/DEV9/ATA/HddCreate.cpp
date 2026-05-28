@@ -15,8 +15,6 @@
 
 #include "common/FileSystem.h"
 
-#include <fmt/format.h>
-
 #include <file/file_path.h>
 
 #include "HddCreate.h"
@@ -264,7 +262,8 @@ void HddCreate::WriteImage(std::string hddPath, u64 fileBytes, u64 zeroSizeBytes
 
 void HddCreate::SetFileProgress(u64 currentSize)
 {
-	Console.WriteLn(fmt::format("{} / {} Bytes", currentSize, neededSize).c_str());
+	Console.WriteLn(StringUtil::StdStringFromFormat("%llu / %llu Bytes",
+		(unsigned long long)currentSize, (unsigned long long)neededSize).c_str());
 }
 
 void HddCreate::SetError()

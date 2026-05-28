@@ -29,7 +29,6 @@ INCFLAGS := \
 	-I$(DEPS_DIR) \
 	-I$(DEPS_DIR)/include \
 	-I$(DEPS_DIR)/xbyak \
-	-I$(DEPS_DIR)/fmt/fmt/include \
 	-I$(DEPS_DIR)/rapidyaml/rapidyaml/src \
 	-I$(DEPS_DIR)/rapidyaml/rapidyaml/ext/c4core/src \
 	-I$(DEPS_DIR)/rapidyaml/rapidyaml/ext/c4core/src/c4/ext/fast_float/include \
@@ -610,11 +609,6 @@ SOURCES_C += \
 	$(DEPS_DIR)/cpuinfo/src/x86/vendor.c \
 	$(DEPS_DIR)/cpuinfo/src/x86/windows/init.c \
 	$(DEPS_DIR)/cpuinfo/deps/clog/src/clog.c
-
-# fmt
-SOURCES_CXX += \
-	$(DEPS_DIR)/fmt/fmt/src/format.cc \
-	$(DEPS_DIR)/fmt/fmt/src/os.cc
 
 # rapidyaml (rolls c4core into the same library, matching ryml.vcxproj)
 SOURCES_CXX += \

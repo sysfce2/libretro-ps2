@@ -18,7 +18,6 @@
 
 #include <libretro.h>
 
-#include <fmt/format.h>
 
 #include "common/Console.h"
 #include "common/StringUtil.h"
@@ -1060,14 +1059,20 @@ std::string GSDeviceOGL::GenGlslHeader(const std::string_view& entry, GLenum typ
 	return header;
 }
 
+static void GSDeviceOGLAppendShaderMacro(std::string& macro, const char* name, int value)
+{
+	macro += StringUtil::StdStringFromFormat("#define %s %d\n", name, value);
+}
+
 std::string GSDeviceOGL::GetVSSource(VSSelector sel)
 {
 	Console.WriteLn("Compiling new vertex shader with selector 0x%" PRIX64, sel.key);
 
-	std::string macro = fmt::format("#define VS_FST {}\n", static_cast<u32>(sel.fst))
-		+ fmt::format("#define VS_IIP {}\n", static_cast<u32>(sel.iip))
-		+ fmt::format("#define VS_POINT_SIZE {}\n", static_cast<u32>(sel.point_size))
-	  + fmt::format("#define VS_EXPAND {}\n", static_cast<int>(sel.expand));
+	std::string macro;
+	GSDeviceOGLAppendShaderMacro(macro, "VS_FST", sel.fst);
+	GSDeviceOGLAppendShaderMacro(macro, "VS_IIP", sel.iip);
+	GSDeviceOGLAppendShaderMacro(macro, "VS_POINT_SIZE", sel.point_size);
+	GSDeviceOGLAppendShaderMacro(macro, "VS_EXPAND", (int)sel.expand);
 
 	std::string src = GenGlslHeader("vs_main", GL_VERTEX_SHADER, macro);
 	src += tfx_vs_glsl_shader_raw;
@@ -1078,62 +1083,62 @@ std::string GSDeviceOGL::GetPSSource(const PSSelector& sel)
 {
 	Console.WriteLn("Compiling new pixel shader with selector 0x%" PRIX64 "%08X", sel.key_hi, sel.key_lo);
 
-	std::string macro = fmt::format("#define PS_FST {}\n", sel.fst)
-		+ fmt::format("#define PS_WMS {}\n", sel.wms)
-		+ fmt::format("#define PS_WMT {}\n", sel.wmt)
-		+ fmt::format("#define PS_ADJS {}\n", sel.adjs)
-		+ fmt::format("#define PS_ADJT {}\n", sel.adjt)
-		+ fmt::format("#define PS_AEM_FMT {}\n", sel.aem_fmt)
-		+ fmt::format("#define PS_PAL_FMT {}\n", sel.pal_fmt)
-		+ fmt::format("#define PS_DST_FMT {}\n", sel.dst_fmt)
-		+ fmt::format("#define PS_DEPTH_FMT {}\n", sel.depth_fmt)
-		+ fmt::format("#define PS_CHANNEL_FETCH {}\n", sel.channel)
-		+ fmt::format("#define PS_URBAN_CHAOS_HLE {}\n", sel.urban_chaos_hle)
-		+ fmt::format("#define PS_TALES_OF_ABYSS_HLE {}\n", sel.tales_of_abyss_hle)
-		+ fmt::format("#define PS_TEX_IS_FB {}\n", sel.tex_is_fb)
-		+ fmt::format("#define PS_AEM {}\n", sel.aem)
-		+ fmt::format("#define PS_TFX {}\n", sel.tfx)
-		+ fmt::format("#define PS_TCC {}\n", sel.tcc)
-		+ fmt::format("#define PS_ATST {}\n", sel.atst)
-		+ fmt::format("#define PS_AFAIL {}\n", sel.afail)
-		+ fmt::format("#define PS_FOG {}\n", sel.fog)
-		+ fmt::format("#define PS_BLEND_HW {}\n", sel.blend_hw)
-		+ fmt::format("#define PS_A_MASKED {}\n", sel.a_masked)
-		+ fmt::format("#define PS_FBA {}\n", sel.fba)
-		+ fmt::format("#define PS_LTF {}\n", sel.ltf)
-		+ fmt::format("#define PS_AUTOMATIC_LOD {}\n", sel.automatic_lod)
-		+ fmt::format("#define PS_MANUAL_LOD {}\n", sel.manual_lod)
-		+ fmt::format("#define PS_COLCLIP {}\n", sel.colclip)
-		+ fmt::format("#define PS_DATE {}\n", sel.date)
-		+ fmt::format("#define PS_TCOFFSETHACK {}\n", sel.tcoffsethack)
-		+ fmt::format("#define PS_REGION_RECT {}\n", sel.region_rect)
-		+ fmt::format("#define PS_BLEND_A {}\n", sel.blend_a)
-		+ fmt::format("#define PS_BLEND_B {}\n", sel.blend_b)
-		+ fmt::format("#define PS_BLEND_C {}\n", sel.blend_c)
-		+ fmt::format("#define PS_BLEND_D {}\n", sel.blend_d)
-		+ fmt::format("#define PS_IIP {}\n", sel.iip)
-		+ fmt::format("#define PS_SHUFFLE {}\n", sel.shuffle)
-		+ fmt::format("#define PS_SHUFFLE_SAME {}\n", sel.shuffle_same)
-		+ fmt::format("#define PS_PROCESS_BA {}\n", sel.process_ba)
-		+ fmt::format("#define PS_PROCESS_RG {}\n", sel.process_rg)
-		+ fmt::format("#define PS_SHUFFLE_ACROSS {}\n", sel.shuffle_across)
-		+ fmt::format("#define PS_READ16_SRC {}\n", sel.real16src)
-		+ fmt::format("#define PS_WRITE_RG {}\n", sel.write_rg)
-		+ fmt::format("#define PS_FBMASK {}\n", sel.fbmask)
-		+ fmt::format("#define PS_HDR {}\n", sel.hdr)
-		+ fmt::format("#define PS_RTA_CORRECTION {}\n", sel.rta_correction)
-		+ fmt::format("#define PS_RTA_SRC_CORRECTION {}\n", sel.rta_source_correction)
-		+ fmt::format("#define PS_DITHER {}\n", sel.dither)
-		+ fmt::format("#define PS_DITHER_ADJUST {}\n", sel.dither_adjust)
-		+ fmt::format("#define PS_ZCLAMP {}\n", sel.zclamp)
-		+ fmt::format("#define PS_BLEND_MIX {}\n", sel.blend_mix)
-		+ fmt::format("#define PS_ROUND_INV {}\n", sel.round_inv)
-		+ fmt::format("#define PS_FIXED_ONE_A {}\n", sel.fixed_one_a)
-		+ fmt::format("#define PS_PABE {}\n", sel.pabe)
-		+ fmt::format("#define PS_SCANMSK {}\n", sel.scanmsk)
-		+ fmt::format("#define PS_NO_COLOR {}\n", sel.no_color)
-		+ fmt::format("#define PS_NO_COLOR1 {}\n", sel.no_color1)
-	;
+	std::string macro;
+	GSDeviceOGLAppendShaderMacro(macro, "PS_FST", sel.fst);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_WMS", sel.wms);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_WMT", sel.wmt);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_ADJS", sel.adjs);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_ADJT", sel.adjt);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_AEM_FMT", sel.aem_fmt);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_PAL_FMT", sel.pal_fmt);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_DST_FMT", sel.dst_fmt);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_DEPTH_FMT", sel.depth_fmt);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_CHANNEL_FETCH", sel.channel);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_URBAN_CHAOS_HLE", sel.urban_chaos_hle);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_TALES_OF_ABYSS_HLE", sel.tales_of_abyss_hle);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_TEX_IS_FB", sel.tex_is_fb);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_AEM", sel.aem);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_TFX", sel.tfx);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_TCC", sel.tcc);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_ATST", sel.atst);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_AFAIL", sel.afail);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_FOG", sel.fog);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_BLEND_HW", sel.blend_hw);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_A_MASKED", sel.a_masked);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_FBA", sel.fba);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_LTF", sel.ltf);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_AUTOMATIC_LOD", sel.automatic_lod);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_MANUAL_LOD", sel.manual_lod);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_COLCLIP", sel.colclip);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_DATE", sel.date);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_TCOFFSETHACK", sel.tcoffsethack);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_REGION_RECT", sel.region_rect);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_BLEND_A", sel.blend_a);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_BLEND_B", sel.blend_b);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_BLEND_C", sel.blend_c);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_BLEND_D", sel.blend_d);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_IIP", sel.iip);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_SHUFFLE", sel.shuffle);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_SHUFFLE_SAME", sel.shuffle_same);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_PROCESS_BA", sel.process_ba);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_PROCESS_RG", sel.process_rg);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_SHUFFLE_ACROSS", sel.shuffle_across);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_READ16_SRC", sel.real16src);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_WRITE_RG", sel.write_rg);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_FBMASK", sel.fbmask);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_HDR", sel.hdr);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_RTA_CORRECTION", sel.rta_correction);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_RTA_SRC_CORRECTION", sel.rta_source_correction);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_DITHER", sel.dither);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_DITHER_ADJUST", sel.dither_adjust);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_ZCLAMP", sel.zclamp);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_BLEND_MIX", sel.blend_mix);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_ROUND_INV", sel.round_inv);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_FIXED_ONE_A", sel.fixed_one_a);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_PABE", sel.pabe);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_SCANMSK", sel.scanmsk);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_NO_COLOR", sel.no_color);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_NO_COLOR1", sel.no_color1);
 
 	std::string src = GenGlslHeader("ps_main", GL_FRAGMENT_SHADER, macro);
 	src += tfx_fs_glsl_shader_raw;

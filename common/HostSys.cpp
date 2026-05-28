@@ -34,8 +34,6 @@
 
 #include <mutex>
 
-#include "../3rdparty/fmt/fmt/include/fmt/format.h"
-
 #include <encodings/utf.h>
 
 #include "Align.h"
@@ -346,9 +344,9 @@ std::string HostSys::GetFileMappingName(const char* prefix)
 #endif
 #if defined(__FreeBSD__)
 	/* FreeBSD's shm_open(3) requires name to be absolute */
-	return fmt::format("/tmp/{}_{}", prefix, pid);
+	return StringUtil::StdStringFromFormat("/tmp/%s_%u", prefix, pid);
 #else
-	return fmt::format("{}_{}", prefix, pid);
+	return StringUtil::StdStringFromFormat("%s_%u", prefix, pid);
 #endif
 }
 

@@ -105,7 +105,6 @@ target_link_libraries(common PRIVATE
 )
 
 target_link_libraries(common PUBLIC
-	fmt::fmt
 	fast_float
 )
 

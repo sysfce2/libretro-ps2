@@ -17,8 +17,6 @@
 #include <fstream>
 #include <optional>
 
-#include <fmt/format.h>
-
 #include "../3rdparty/rapidyaml/rapidyaml/src/ryml_std.hpp"
 #include "../3rdparty/rapidyaml/rapidyaml/src/ryml.hpp"
 
@@ -52,7 +50,14 @@ static std::once_flag s_load_once_flag;
 
 std::string GameDatabaseSchema::GameEntry::memcardFiltersAsString() const
 {
-	return fmt::to_string(fmt::join(memcardFilters, "/"));
+	std::string ret;
+	for (size_t i = 0; i < memcardFilters.size(); i++)
+	{
+		if (i != 0)
+			ret += '/';
+		ret += memcardFilters[i];
+	}
+	return ret;
 }
 
 const std::string* GameDatabaseSchema::GameEntry::findPatch(u32 crc) const
@@ -60,12 +65,12 @@ const std::string* GameDatabaseSchema::GameEntry::findPatch(u32 crc) const
 	if (crc == 0)
 		return nullptr;
 
-	Console.WriteLn(fmt::format("[GameDB] Searching for patch with CRC '{:08X}'", crc).c_str());
+	Console.WriteLn(StringUtil::StdStringFromFormat("[GameDB] Searching for patch with CRC '%08X'", crc).c_str());
 
 	auto it = patches.find(crc);
 	if (it != patches.end())
 	{
-		Console.WriteLn(fmt::format("[GameDB] Found patch with CRC '{:08X}'", crc).c_str());
+		Console.WriteLn(StringUtil::StdStringFromFormat("[GameDB] Found patch with CRC '%08X'", crc).c_str());
 		return &it->second;
 	}
 
@@ -663,7 +668,7 @@ u32 GameDatabaseSchema::GameEntry::applyGSHardwareFixes(Pcsx2Config::GSOptions& 
 				continue;
 
 			Console.Warning("[GameDB] Skipping GS Hardware Fix: %s to [mode=%d]", getHWFixName(id), value);
-			fmt::format_to(std::back_inserter(disabled_fixes), "{} {} = {}", disabled_fixes.empty() ? "  " : "\n  ", getHWFixName(id), value);
+			disabled_fixes += StringUtil::StdStringFromFormat("%s %s = %d", disabled_fixes.empty() ? "  " : "\n  ", getHWFixName(id), value);
 			continue;
 		}
 

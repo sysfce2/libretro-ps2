@@ -866,7 +866,6 @@ endif()
 
 target_link_libraries(PCSX2_FLAGS INTERFACE
 	common
-	fmt::fmt
 	ryml
 	chdr-static
 	libzip::zip

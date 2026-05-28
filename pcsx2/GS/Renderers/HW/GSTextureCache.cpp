@@ -14,8 +14,6 @@
 #include "common/Console.h"
 #include "common/HashCombine.h"
 
-#include <fmt/format.h>
-
 #include "GSTextureCache.h"
 #include "GSTextureReplacements.h"
 #include "GSRendererHW.h"

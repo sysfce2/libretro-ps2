@@ -19,8 +19,6 @@
 #include <sstream>
 #include <mutex>
 
-#include <fmt/format.h>
-
 #include <file/file_path.h>
 
 #include "../common/Console.h"
@@ -293,7 +291,7 @@ void VMManager::LoadPatches(const std::string& serial, u32 crc)
 {
 	std::string message;
 	int patch_count = 0;
-	const std::string crc_string(fmt::format("{:08X}", crc));
+	const std::string crc_string(StringUtil::StdStringFromFormat("%08X", crc));
 	s_patches_crc                   = crc;
 	s_active_widescreen_patches     = 0;
 	s_active_no_interlacing_patches = 0;
@@ -308,7 +306,7 @@ void VMManager::LoadPatches(const std::string& serial, u32 crc)
 			if (patches && (patch_count = LoadPatchesFromString(*patches)) > 0)
 			{
 				Console.WriteLn("(GameDB) Patches Loaded: %d", patch_count);
-				fmt::format_to(std::back_inserter(message), "{} game patches", patch_count);
+				message += StringUtil::StdStringFromFormat("%d game patches", patch_count);
 			}
 
 			LoadDynamicPatches(game->dynaPatches);
@@ -323,7 +321,7 @@ void VMManager::LoadPatches(const std::string& serial, u32 crc)
 		if (cheat_count > 0)
 		{
 			Console.WriteLn("Cheats Loaded: %d", cheat_count);
-			fmt::format_to(std::back_inserter(message), "{}{} cheat patches", (patch_count > 0) ? " and " : "", cheat_count);
+			message += StringUtil::StdStringFromFormat("%s%d cheat patches", (patch_count > 0) ? " and " : "", cheat_count);
 		}
 	}
 
@@ -353,7 +351,7 @@ void VMManager::LoadPatches(const std::string& serial, u32 crc)
 
 		if (s_active_widescreen_patches > 0)
 		{
-			fmt::format_to(std::back_inserter(message), "{}{} widescreen patches", (patch_count > 0 || cheat_count > 0) ? " and " : "", s_active_widescreen_patches);
+			message += StringUtil::StdStringFromFormat("%s%d widescreen patches", (patch_count > 0 || cheat_count > 0) ? " and " : "", s_active_widescreen_patches);
 
 			// Switch to 16:9 if widescreen patches are enabled, and AR is auto.
 			// TODO/FIXME - implement
@@ -388,7 +386,7 @@ void VMManager::LoadPatches(const std::string& serial, u32 crc)
 
 		if (s_active_no_interlacing_patches > 0)
 		{
-			fmt::format_to(std::back_inserter(message), "{}{} no-interlacing patches", (patch_count > 0 || cheat_count > 0 || s_active_widescreen_patches > 0) ? " and " : "", s_active_no_interlacing_patches);
+			message += StringUtil::StdStringFromFormat("%s%u no-interlacing patches", (patch_count > 0 || cheat_count > 0 || s_active_widescreen_patches > 0) ? " and " : "", s_active_no_interlacing_patches);
 
 			// Disable interlacing in GS if active.
 			if (EmuConfig.GS.InterlaceMode == GSInterlaceMode::Automatic)
