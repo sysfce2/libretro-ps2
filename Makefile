@@ -592,6 +592,40 @@ ifeq ($(IS_X86),1)
    CXXFLAGS += -msse -msse2 -msse4.1 -mfxsr -msse3
 endif
 
+# ---------------------------------------------------------------------------
+# Multi-ISA runtime SIMD dispatch (opt-in; default OFF).
+#
+# When OFF (default), the GS/IPU MultiISA sources are compiled once at the
+# SSE4.1 baseline above and MultiISA.h resolves CURRENT_ISA to isa_native.
+# This is byte-identical to the historical core build: the SSE4.1 floor is
+# preserved and no AVX/AVX2 code is emitted or executed.
+#
+# When ON, the unshared MultiISA sources are compiled three times (sse4/avx/
+# avx2) into separate objects and all tiers are linked; cpuinfo selects the
+# best path the host CPU supports at runtime (MULTI_ISA_SELECT in MultiISA.h).
+# The sse4 tier remains and is the path chosen on any CPU lacking AVX/AVX2, so
+# enabling this does NOT regress support for SSE4-or-earlier hosts.
+#
+# Only meaningful on x86. The per-tier flag maps and object generation are
+# wired in subsequent commits; this commit only introduces the switch and the
+# tier-flag variables, and intentionally changes nothing while OFF.
+ENABLE_MULTI_ISA ?= 0
+
+ifeq ($(IS_X86),1)
+ifeq ($(ENABLE_MULTI_ISA),1)
+   # Per-tier compile flags (GCC/clang). Feature flags rather than -march so
+   # the compiler can still inline shared helpers across tiers (per cmake).
+   # MSVC/MinGW tier maps are added in a later commit.
+   MULTI_ISA_FLAGS_sse4 := -msse4.1
+   MULTI_ISA_FLAGS_avx  := -msse4.1 -mavx
+   MULTI_ISA_FLAGS_avx2 := -msse4.1 -mavx -mavx2 -mbmi -mbmi2 -mfma
+   # Tiers in oldest->newest order. Link/archive order MUST follow this so the
+   # linker resolves shared inline (ODR-duplicated) symbols to the SSE4-safe
+   # copy; see the ordering note where tier objects are archived.
+   MULTI_ISA_TIERS := sse4 avx avx2
+endif
+endif
+
 LDFLAGS += $(fpic) $(SHARED)
 FLAGS   += $(fpic) $(INCFLAGS)
 
