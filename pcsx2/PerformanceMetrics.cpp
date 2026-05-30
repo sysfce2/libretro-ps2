@@ -13,32 +13,38 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../common/Timer.h"
-
 #include "Config.h"
 #include "PerformanceMetrics.h"
 
-static Common::Timer s_last_update_time;
-
 // internal fps heuristics
+//
+// Update() runs once per VSync (frame). All this needs to do is decide which
+// GS signal the running game uses to mark a completed internal frame
+// (privileged register writes vs DISPFB blits) so SkipDuplicateFrames can use
+// it. That classification is a property of what the game does, not of wall
+// time, so it is re-evaluated over a fixed window of frames rather than a
+// real-time interval. UPDATE_INTERVAL_FRAMES (32) is ~0.5s at 60fps, matching
+// the cadence of the previous Common::Timer-based 0.5s window without the
+// wall-clock dependency.
+static constexpr u32 UPDATE_INTERVAL_FRAMES = 32;
+
 static PerformanceMetrics::InternalFPSMethod s_internal_fps_method = PerformanceMetrics::InternalFPSMethod::None;
 static u32 s_gs_framebuffer_blits_since_last_update = 0;
 static u32 s_gs_privileged_register_writes_since_last_update = 0;
+static u32 s_frames_since_last_update = 0;
 
 void PerformanceMetrics::Clear()
 {
 	Reset();
 
 	s_internal_fps_method = PerformanceMetrics::InternalFPSMethod::None;
-
 }
 
 void PerformanceMetrics::Reset()
 {
 	s_gs_framebuffer_blits_since_last_update = 0;
 	s_gs_privileged_register_writes_since_last_update = 0;
-
-	s_last_update_time.Reset();
+	s_frames_since_last_update = 0;
 }
 
 void PerformanceMetrics::Update(bool gs_register_write, bool fb_blit)
@@ -46,13 +52,8 @@ void PerformanceMetrics::Update(bool gs_register_write, bool fb_blit)
 	s_gs_privileged_register_writes_since_last_update += static_cast<u32>(gs_register_write);
 	s_gs_framebuffer_blits_since_last_update += static_cast<u32>(fb_blit);
 
-	const uint64_t now_ticks  = Common::Timer::GetCurrentValue();
-	const uint64_t ticks_diff = now_ticks - s_last_update_time.GetStartValue();
-	const float time          = Common::Timer::ConvertValueToSeconds(ticks_diff);
-	if (time < 0.5f)
+	if (++s_frames_since_last_update < UPDATE_INTERVAL_FRAMES)
 		return;
-
-	s_last_update_time.ResetTo(now_ticks);
 
 	// prefer privileged register write based framerate detection, it's less likely to have false positives
 	if (s_gs_privileged_register_writes_since_last_update > 0 && !EmuConfig.Gamefixes.BlitInternalFPSHack)
@@ -64,6 +65,7 @@ void PerformanceMetrics::Update(bool gs_register_write, bool fb_blit)
 
 	s_gs_privileged_register_writes_since_last_update = 0;
 	s_gs_framebuffer_blits_since_last_update = 0;
+	s_frames_since_last_update = 0;
 }
 
 PerformanceMetrics::InternalFPSMethod PerformanceMetrics::GetInternalFPSMethod()
