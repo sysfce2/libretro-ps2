@@ -105,11 +105,6 @@ void MemoryCardProtocol::SetSector()
 	u8 computedChecksum = sectorLSB ^ sector2nd ^ sector3rd ^ sectorMSB;
 	mcd->goodSector = (computedChecksum == expectedChecksum);
 
-	if (!mcd->goodSector)
-	{
-		Console.Warning("%s() Warning! Memcard sector checksum failed! (Expected %02X != Actual %02X) Please report to the PCSX2 team!", __FUNCTION__, expectedChecksum, computedChecksum);
-	}
-
 	u32 newSector = sectorLSB | (sector2nd << 8) | (sector3rd << 16) | (sectorMSB << 24);
 	mcd->sectorAddr = newSector;
 
@@ -128,35 +123,27 @@ void MemoryCardProtocol::GetSpecs()
 	fifoOut.push_back(0x2b);
 	
 	const u8 sectorSizeLSB = (info.SectorSize & 0xff);
-	//checksum ^= sectorSizeLSB;
 	fifoOut.push_back(sectorSizeLSB);
 
 	const u8 sectorSizeMSB = (info.SectorSize >> 8);
-	//checksum ^= sectorSizeMSB;
 	fifoOut.push_back(sectorSizeMSB);
 
 	const u8 eraseBlockSizeLSB = (info.EraseBlockSizeInSectors & 0xff);
-	//checksum ^= eraseBlockSizeLSB;
 	fifoOut.push_back(eraseBlockSizeLSB);
 
 	const u8 eraseBlockSizeMSB = (info.EraseBlockSizeInSectors >> 8);
-	//checksum ^= eraseBlockSizeMSB;
 	fifoOut.push_back(eraseBlockSizeMSB);
 
 	const u8 sectorCountLSB = (info.McdSizeInSectors & 0xff);
-	//checksum ^= sectorCountLSB;
 	fifoOut.push_back(sectorCountLSB);
 
 	const u8 sectorCount2nd = (info.McdSizeInSectors >> 8);
-	//checksum ^= sectorCount2nd;
 	fifoOut.push_back(sectorCount2nd);
 
 	const u8 sectorCount3rd = (info.McdSizeInSectors >> 16);
-	//checksum ^= sectorCount3rd;
 	fifoOut.push_back(sectorCount3rd);
 
 	const u8 sectorCountMSB = (info.McdSizeInSectors >> 24);
-	//checksum ^= sectorCountMSB;
 	fifoOut.push_back(sectorCountMSB);
 	
 	fifoOut.push_back(info.Xor);
