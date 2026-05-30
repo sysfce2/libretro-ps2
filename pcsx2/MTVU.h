@@ -45,6 +45,7 @@ public:
 	Threading::UserspaceSemaphore semaXGkick;
 	std::atomic<unsigned int> vuCycles[4]; // Used for VU cycle stealing hack
 	u32 vuCycleIdx;  // Used for VU cycle stealing hack
+	u32 vuFBRST;
 
 	enum InterruptFlag {
 		InterruptFlagFinish = 1 << 0,

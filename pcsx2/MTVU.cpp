@@ -154,7 +154,7 @@ void VU_Thread::ExecuteRingBuffer(void)
 					s32 addr = Read();
 					vifRegs.top = Read();
 					vifRegs.itop = Read();
-					Read(); // fbrst: consumed off the ring but unused
+					vuFBRST = Read();
 					if (addr != -1)
 						vuRegs[1].VI[REG_TPC].UL = addr & 0x7FF;
 					CpuVU1->SetStartPC(vuRegs[1].VI[REG_TPC].UL << 3);
