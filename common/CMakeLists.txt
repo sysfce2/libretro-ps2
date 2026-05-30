@@ -18,7 +18,6 @@ target_sources(common PRIVATE
 	SettingsWrapper.cpp
 	StringUtil.cpp
 	TextureDecompress.cpp
-	Timer.cpp
 	emitter/avx.cpp
 	emitter/groups.cpp
 	emitter/jmp.cpp
@@ -48,7 +47,6 @@ target_sources(common PRIVATE
 	SettingsInterface.h
 	SettingsWrapper.h
 	StringUtil.h
-	Timer.h
 	TextureDecompress.h
 	Threading.h
 	VectorIntrin.h

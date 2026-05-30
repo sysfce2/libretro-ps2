@@ -132,7 +132,6 @@ SOURCES_CXX += \
 	$(COMMON_DIR)/StringUtil.cpp \
 	$(COMMON_DIR)/TextureDecompress.cpp \
 	$(COMMON_DIR)/Threads.cpp \
-	$(COMMON_DIR)/Timer.cpp \
 	\
 	$(COMMON_DIR)/emitter/avx.cpp \
 	$(COMMON_DIR)/emitter/groups.cpp \
