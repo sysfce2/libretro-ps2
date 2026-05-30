@@ -29,12 +29,4 @@ namespace Internal {
 #define pgmsk( src ) ( (src) & 0x0fff )
 #define mcase( src ) case pgmsk(src)
 
-
-//////////////////////////////////////////////////////////////////////////////////////////
-// Helper for debug logging of IOP Registers.  Takes an input address and returns a
-// register name.
-//
-// This list is not yet exhaustive.  If you spot something that's missing, feel free to
-// fill it in any time. :)
-//
 } };

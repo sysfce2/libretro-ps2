@@ -76,26 +76,18 @@ mem8_t iopHwRead8_Page1( u32 addr )
 //
 mem8_t iopHwRead8_Page3( u32 addr )
 {
-	mem8_t ret;
 	if( addr == 0x1f803100 )	// PS/EE/IOP conf related
-		//ret = 0x10; // Dram 2M
-		ret = 0xFF; //all high bus is the corect default state for CEX PS2!
-	else
-		ret = psxHu8( addr );
-	return ret;
+		return 0xFF; //all high bus is the corect default state for CEX PS2!
+	return psxHu8( addr );
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
 //
 mem8_t iopHwRead8_Page8( u32 addr )
 {
-	mem8_t ret;
-
 	if (addr == HW_SIO2_FIFO)
-		ret = sio2.Read();
-	else
-		ret = psxHu8(addr);
-	return ret;
+		return sio2.Read();
+	return psxHu8(addr);
 }
 //////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -256,12 +248,10 @@ static __fi T _HwRead_16or32_Page1( u32 addr )
 			break;
 
 			mcase (0x1f801820): // MDEC
-				// ret = psxHu32(addr); // old
 				ret = mdecRead0();
 			break;
 
 			mcase (0x1f801824): // MDEC
-				//ret = psxHu32(addr); // old
 				ret = mdecRead1();
 			break;
 
@@ -295,16 +285,14 @@ mem16_t iopHwRead16_Page1( u32 addr )
 //
 mem16_t iopHwRead16_Page3( u32 addr )
 {
-	mem16_t ret = psxHu16(addr);
-	return ret;
+	return psxHu16(addr);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
 //
 mem16_t iopHwRead16_Page8( u32 addr )
 {
-	mem16_t ret = psxHu16(addr);
-	return ret;
+	return psxHu16(addr);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -326,67 +314,51 @@ mem32_t iopHwRead32_Page3( u32 addr )
 //
 mem32_t iopHwRead32_Page8( u32 addr )
 {
-
 	u32 masked_addr = addr & 0x0fff;
-	mem32_t ret;
-
 	if( masked_addr >= 0x200 )
 	{
 		if( masked_addr < 0x240 )
 		{
 			const int parm = (masked_addr-0x200) / 4;
-			ret = sio2.send3[parm];
+			return sio2.send3[parm];
 		}
 		else if( masked_addr < 0x260 )
 		{
 			// SIO2 Send commands alternate registers.  First reg maps to Send1, second
 			// to Send2, third to Send1, etc.  And the following clever code does this:
 			const int parm = (masked_addr-0x240) / 8;
-			ret = (masked_addr & 4) ? sio2.send2[parm] : sio2.send1[parm];
+			return (masked_addr & 4) ? sio2.send2[parm] : sio2.send1[parm];
 		}
 		else if( masked_addr <= 0x280 )
 		{
 			switch( masked_addr )
 			{
 				case (HW_SIO2_DATAIN & 0x0fff):
-					ret = psxHu32(addr);
-					break;
+					return psxHu32(addr);
 				case (HW_SIO2_FIFO & 0x0fff):
-					ret = psxHu32(addr);
-					break;
+					return psxHu32(addr);
 				case (HW_SIO2_CTRL & 0x0fff):
-					ret = sio2.ctrl;
-					break;
+					return sio2.ctrl;
 				case (HW_SIO2_RECV1 & 0xfff):
-					ret = sio2.recv1;
-					break;
+					return sio2.recv1;
 				case (HW_SIO2_RECV2 & 0x0fff):
-					ret = sio2.recv2;
-					break;
+					return sio2.recv2;
 				case (HW_SIO2_RECV3 & 0x0fff):
-					ret = sio2.recv3;
-					break;
+					return sio2.recv3;
 				case (0x1f808278 & 0x0fff):
-					ret = sio2.unknown1;
-					break;
+					return sio2.unknown1;
 				case (0x1f80827C & 0x0fff):
-					ret = sio2.unknown2;
-					break;
+					return sio2.unknown2;
 				case (HW_SIO2_INTR & 0x0fff):
-					ret = sio2.iStat;
-					break;
+					return sio2.iStat;
 				default:
-					ret = psxHu32(addr);
-					break;
+					return psxHu32(addr);
 			}
 		}
 		else if( masked_addr >= pgmsk(HW_FW_START) && masked_addr <= pgmsk(HW_FW_END) )
-			ret = FWread32( addr );
-		else
-			ret = psxHu32(addr);
+			return FWread32( addr );
 	}
-	else ret = psxHu32(addr);
-	return ret;
+	return psxHu32(addr);
 }
 
 }
