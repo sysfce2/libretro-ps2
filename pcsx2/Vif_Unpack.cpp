@@ -147,10 +147,7 @@ static void UNPACK_Invalid(u32* dest, const void* src)
 {
 	static bool warned = false;
 	if (!warned)
-	{
 		warned = true;
-		Console.Warning("[VIF] Invalid unpack format encountered; ignoring.");
-	}
 }
 
 #define UnpackFuncSet( vt, idx, mode, usn, doMask ) \
