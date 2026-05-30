@@ -334,8 +334,10 @@ void MTGS::WaitGS(bool isMTVU)
 	}
 	else
 	{
-		/* if it returns false, MTGS thread died */
-		if (!s_sem_event.WaitForEmpty()) { }
+		/* Blocks until the ring drains. Return value (false if the
+		 * MTGS thread has died) is unused here, matching the other
+		 * WaitForEmpty call sites in MTVU and GSRasterizer. */
+		s_sem_event.WaitForEmpty();
 	}
 }
 
