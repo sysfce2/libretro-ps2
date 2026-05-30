@@ -1811,9 +1811,6 @@ static void cpu_thread_entry(VMBootParameters boot_params)
 						continue;
 
 					case VMState::Stopping:
-#if 0
-						VMManager::Shutdown(fals);
-#endif
 						return;
 
 					case VMState::Shutdown:
@@ -1825,24 +1822,24 @@ static void cpu_thread_entry(VMBootParameters boot_params)
 						 * is already Shutdown - never Stopping. Without an
 						 * explicit case here, cpu_thread would fall to
 						 * 'default: continue;' and spin forever, hanging
-						 * cpu_thread.join(). The 100 ms wait_for timeout
-						 * masks this only when the libretro thread spends
-						 * over 100 ms in VMManager::Shutdown - any faster
-						 * and the join hangs. */
+						 * cpu_thread.join(). That notify is issued under
+						 * cpu_thread_mtx, so the 'case Paused' wait observes
+						 * the Shutdown state and exits here immediately. */
 						return;
 
 					case VMState::Paused:
 					{
-						/* Sleep on cpu_thread_cv until libretro thread
-						 * transitions us out of Paused. The 100 ms
-						 * timeout is belt-and-suspenders: if a notify
-						 * is ever missed (e.g. a future resume site
-						 * forgets to go through cpu_thread_resume()),
-						 * we still poll the predicate at 10 Hz instead
-						 * of burning a core. */
+						/* Sleep on cpu_thread_cv until the libretro thread
+						 * transitions us out of Paused. Every state change
+						 * out of Paused happens under cpu_thread_mtx before
+						 * its notify_one (cpu_thread_resume() and the unload
+						 * path in retro_unload_game), so the predicate-then-
+						 * wait here cannot miss a wakeup: holding the lock
+						 * across the check closes the gap. A plain wait()
+						 * lets a paused core sleep fully instead of waking
+						 * 10x/s to re-poll. */
 						std::unique_lock<std::mutex> lk(cpu_thread_mtx);
-						cpu_thread_cv.wait_for(lk,
-							std::chrono::milliseconds(100),
+						cpu_thread_cv.wait(lk,
 							[]{ return VMManager::GetState() != VMState::Paused; });
 						continue;
 					}
@@ -2190,12 +2187,23 @@ void retro_unload_game(void)
 	}
 
 	VMManager::Shutdown();
-	/* Shutdown() flipped state to Stopping; if cpu_thread happens to
-	 * be sleeping in its 'case Paused' wait (post cpu_thread_pause
-	 * above), it needs a notify to observe the new state and run
-	 * through to its 'case Stopping: return;' branch. Without this,
-	 * cpu_thread.join() below would block until the 100 ms wait
-	 * timeout elapses. */
+	/* Shutdown() flipped state to Stopping; if cpu_thread is sleeping
+	 * in its 'case Paused' wait (post cpu_thread_pause above), it
+	 * needs a notify to observe the new state and run through to its
+	 * 'case Stopping: return;' branch so cpu_thread.join() can
+	 * complete.
+	 *
+	 * Take cpu_thread_mtx across the notify. Shutdown() already stored
+	 * the new state, so acquiring the lock here serialises against the
+	 * cpu_thread's predicate-check-then-wait: either it has not yet
+	 * checked (it will see the new state and not sleep), or it is
+	 * already in wait() (it gets this notify). This is what makes the
+	 * plain wait() in 'case Paused' safe -- the previous code notified
+	 * without the lock and relied on a 100 ms wait_for timeout to
+	 * paper over the resulting lost-wakeup window. */
+	{
+		std::lock_guard<std::mutex> lk(cpu_thread_mtx);
+	}
 	cpu_thread_cv.notify_one();
 	Input::Shutdown();
 	cpu_thread.join();
