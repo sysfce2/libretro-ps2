@@ -1366,6 +1366,30 @@ void GSState::FlushWrite()
 	r.right = r.left + m_env.TRXREG.RRW;
 	r.bottom = r.top + m_env.TRXREG.RRH;
 
+	// If the transfer ended before its declared total, the rect describes more
+	// than was actually written. Some games (e.g. Star Wars - The Clone Wars)
+	// set a huge rect, transfer only part of it, then kill the transfer; nuking
+	// the whole declared rect would invalidate texture-cache data that was never
+	// overwritten. Shrink the invalidation to the area the data actually covers.
+	if (m_tr.end < m_tr.total && GSIsHardwareRenderer())
+	{
+		const GSLocalMemory::psm_t& psm_s = GSLocalMemory::m_psm[m_env.BITBLTBUF.DPSM];
+		// Convert to nibbles then back to bytes after, in case trbpp is 4.
+		const u32 in_data_pixel_count = (((len * 2) + ((psm_s.trbpp / 4) - 1)) / (psm_s.trbpp / 4));
+		const u32 rect_pixel_count = r.width() * r.height();
+
+		if (rect_pixel_count > in_data_pixel_count)
+		{
+			const int calculated_height = ((in_data_pixel_count + (r.width() - 1)) / r.width());
+
+			// Just setting the height should be okay...
+			r.w = std::max(r.y + calculated_height, psm_s.bs.y);
+
+			if (m_draw_transfers.size() > 0 && m_env.BITBLTBUF.DBP == m_draw_transfers.back().blit.DBP)
+				m_draw_transfers.back().rect = r;
+		}
+	}
+
 	InvalidateVideoMem(m_env.BITBLTBUF, r);
 
 	const GSLocalMemory::writeImage wi = GSLocalMemory::m_psm[m_env.BITBLTBUF.DPSM].wi;
