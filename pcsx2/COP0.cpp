@@ -139,40 +139,46 @@ void MapTLB(const tlbs& t, int i)
 	u32 mask, addr;
 	u32 saddr, eaddr;
 
+	// A scratchpad (SPR) TLB entry must map the scratchpad buffer and must NOT
+	// also run the normal EntryLo0/EntryLo1 page mapping below. Previously an
+	// SPR entry fell through to the normal path unless VPN2 happened to be the
+	// default 0x70000000, so an SPR entry mapped to any other address got both
+	// the scratchpad map and bogus normal page mappings. Map only the buffer.
 	if (t.S)
-		vtlb_VMapBuffer(t.VPN2, eeMem->Scratch, Ps2MemSize::Scratch);
-
-	if (t.VPN2 == 0x70000000)
-		return; //uh uhh right ...
-
-	if (t.EntryLo0 & 0x2)
 	{
-		mask = ((~t.Mask) << 1) & 0xfffff;
-		saddr = t.VPN2 >> 12;
-		eaddr = saddr + t.Mask + 1;
-
-		for (addr = saddr; addr < eaddr; addr++)
+		vtlb_VMapBuffer(t.VPN2, eeMem->Scratch, Ps2MemSize::Scratch);
+	}
+	else
+	{
+		if (t.EntryLo0 & 0x2)
 		{
-			if ((addr & mask) == ((t.VPN2 >> 12) & mask)) /* match */
+			mask = ((~t.Mask) << 1) & 0xfffff;
+			saddr = t.VPN2 >> 12;
+			eaddr = saddr + t.Mask + 1;
+
+			for (addr = saddr; addr < eaddr; addr++)
 			{
-				vtlb_VMap(addr << 12, t.PFN0 + ((addr - saddr) << 12), 0x1000);
-				Cpu->Clear(addr << 12, 0x400);
+				if ((addr & mask) == ((t.VPN2 >> 12) & mask)) /* match */
+				{
+					vtlb_VMap(addr << 12, t.PFN0 + ((addr - saddr) << 12), 0x1000);
+					Cpu->Clear(addr << 12, 0x400);
+				}
 			}
 		}
-	}
 
-	if (t.EntryLo1 & 0x2)
-	{
-		mask = ((~t.Mask) << 1) & 0xfffff;
-		saddr = (t.VPN2 >> 12) + t.Mask + 1;
-		eaddr = saddr + t.Mask + 1;
-
-		for (addr = saddr; addr < eaddr; addr++)
+		if (t.EntryLo1 & 0x2)
 		{
-			if ((addr & mask) == ((t.VPN2 >> 12) & mask)) /* match */
+			mask = ((~t.Mask) << 1) & 0xfffff;
+			saddr = (t.VPN2 >> 12) + t.Mask + 1;
+			eaddr = saddr + t.Mask + 1;
+
+			for (addr = saddr; addr < eaddr; addr++)
 			{
-				vtlb_VMap(addr << 12, t.PFN1 + ((addr - saddr) << 12), 0x1000);
-				Cpu->Clear(addr << 12, 0x400);
+				if ((addr & mask) == ((t.VPN2 >> 12) & mask)) /* match */
+				{
+					vtlb_VMap(addr << 12, t.PFN1 + ((addr - saddr) << 12), 0x1000);
+					Cpu->Clear(addr << 12, 0x400);
+				}
 			}
 		}
 	}
