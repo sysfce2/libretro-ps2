@@ -710,7 +710,7 @@ void GSRendererHW::ConvertSpriteTextureShuffle(u32& process_rg, u32& process_ba,
  * New templated ConvertSpriteTextureShuffleImpl + ConvertSpriteTextureShuffle(rt,tex)
  * overload, consuming m_texture_shuffle_info. Defined alongside the legacy
  * ConvertSpriteTextureShuffle(process_rg,...) overload above; NOT yet called (stage 3b
- * rewires the call site onto this path). GL_*/pxFail dropped; triangle path relies on
+ * rewires the call site onto this path). Debug logging dropped; triangle path relies on
  * the stage 2b sprite-only stub. */
 template<u32 primclass, bool fst>
 void GSRendererHW::ConvertSpriteTextureShuffleImpl(GSTextureCache::Target* rt, GSTextureCache::Source* tex)
@@ -1500,8 +1500,8 @@ GSVector4i GSRendererHW::GetSplitTextureShuffleDrawRect() const
 
 /* --- Texture-shuffle detection (ported from upstream refactor 06616ec98). ---
  * Populates m_texture_shuffle_info in parallel with the legacy detection; the
- * result is not consumed yet (stage 3 rewires the conversion onto it). GL_INS/
- * GL_PUSH debug logging and pxFail asserts are dropped (absent in the fork), the
+ * result is not consumed yet (stage 3 rewires the conversion onto it). Debug
+ * logging and asserts are dropped (absent in the fork), the
  * GS_TRIANGLE_CLASS path relies on the stubbed GetQuadCorners (sprite-only), and
  * the raw 16-bit fbmsk is computed inline via Convert32BitTo16BitMask rather than
  * through the fork's GetEffectiveTextureShuffleFbmsk, which returns a different
