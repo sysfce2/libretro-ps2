@@ -2324,6 +2324,14 @@ bool retro_serialize(void* data, size_t size)
 
 	cpu_thread_pause();
 
+	/* Quiesce the MTVU worker and GS thread before snapshotting, so the VU
+	 * and GS state we capture is consistent and not mid-update by another
+	 * thread (matches the load path and the normal save/load invariant).
+	 * WaitVU() is a no-op when the multithreaded VU1 is not active, so it is
+	 * safe to call unconditionally. */
+	vu1Thread.WaitVU();
+	MTGS::WaitGS(false);
+
 	/* retro_serialize_size() already computed the exact upper bound on
 	 * what we need. Reserve once so memSavingState's incremental
 	 * resize() calls inside FreezeMem/PrepBlock don't realloc and copy
@@ -2392,6 +2400,20 @@ bool retro_unserialize(const void* data, size_t size)
 	std::vector<u8> buffer;
 
 	cpu_thread_pause();
+
+	/* cpu_thread_pause() only stops the EE/main thread. Before we overwrite
+	 * VU and GS state below we must also quiesce the MTVU worker and the GS
+	 * thread, exactly as the normal reset/load path does - otherwise, when
+	 * loading a state while the VM is already running (e.g. RetroArch "Load
+	 * State" mid-game) the still-live VU1 thread keeps operating on the VU
+	 * memory / micro programs / JIT state we are in the middle of replacing,
+	 * corrupting the VM so it can't continue and every later load fails until
+	 * the content is closed and relaunched. A freshly booted VM has these
+	 * threads idle, which is why a cold load worked while an in-session load
+	 * did not. WaitVU() is a no-op when the multithreaded VU1 is not active,
+	 * so it is safe to call unconditionally. */
+	vu1Thread.WaitVU();
+	MTGS::WaitGS(false);
 
 	/* resize() (not reserve()): m_memory.size() is what PrepBlock and
 	 * memLoadingState::FreezeMem use for bounds-checking. With reserve()
