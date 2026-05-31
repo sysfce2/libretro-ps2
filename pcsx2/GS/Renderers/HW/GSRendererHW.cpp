@@ -5264,14 +5264,9 @@ __ri void GSRendererHW::HandleTextureHazards(const GSTextureCache::Target* rt, c
 
 	unscaled_size = copy_size;
 	scale = m_downscale_source ? 1.0f : src_target->GetScale();
-	const float src_scale = src_target->GetScale();
 
 	const GSVector2i scaled_copy_size = GSVector2i(static_cast<int>(std::ceil(static_cast<float>(copy_size.x) * scale)),
 		static_cast<int>(std::ceil(static_cast<float>(copy_size.y) * scale)));
-	const GSVector4i scaled_copy_range = GSVector4i((GSVector4(copy_range) * GSVector4(src_scale)).ceil());
-	const GSVector2i scaled_copy_dst_offset =
-		GSVector2i(static_cast<int>(std::ceil(static_cast<float>(copy_dst_offset.x) * scale)),
-			static_cast<int>(std::ceil(static_cast<float>(copy_dst_offset.y) * scale)));
 
 	src_copy.reset(src_target->m_texture->IsDepthStencil() ?
 				   g_gs_device->CreateDepthStencil(
@@ -5316,8 +5311,19 @@ __ri void GSRendererHW::HandleTextureHazards(const GSTextureCache::Target* rt, c
 	}
 	else
 	{
-		g_gs_device->CopyRect(
-			src_target->m_texture, src_copy.get(), scaled_copy_range, scaled_copy_dst_offset.x, scaled_copy_dst_offset.y);
+		const GSVector4i offset = copy_range - GSVector4i(copy_dst_offset).xyxy();
+
+		// Adjust for bilinear, must be done after calculating offset.
+		copy_range.x -= 1;
+		copy_range.y -= 1;
+		copy_range.z += 1;
+		copy_range.w += 1;
+		copy_range = copy_range.rintersect(src_bounds);
+
+		const GSVector4 src_rect = GSVector4(copy_range) / GSVector4(src_unscaled_size).xyxy();
+		const GSVector4 dst_rect = (GSVector4(copy_range) - GSVector4(offset).xyxy()) * scale;
+		g_gs_device->StretchRect(src_target->m_texture, src_rect, src_copy.get(), dst_rect,
+			src_target->m_texture->IsDepthStencil() ? ShaderConvert::DEPTH_COPY : ShaderConvert::COPY, false);
 	}
 	m_conf.tex = src_copy.get();
 }
