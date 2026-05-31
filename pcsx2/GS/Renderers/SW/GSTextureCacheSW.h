@@ -36,8 +36,8 @@ public:
 		bool m_complete;
 		bool m_repeating;
 		std::vector<GSVector2i>* m_p2t;
-		u32 m_valid[MAX_PAGES];
-		u16 m_erase_it[MAX_PAGES];
+		u32 m_valid[GS_MAX_PAGES];
+		u16 m_erase_it[GS_MAX_PAGES];
 		const u32* RESTRICT m_sharedbits;
 
 		// m_valid
@@ -54,7 +54,7 @@ public:
 
 protected:
 	std::unordered_set<Texture*> m_textures;
-	std::array<FastList<Texture*>, MAX_PAGES> m_map;
+	std::array<FastList<Texture*>, GS_MAX_PAGES> m_map;
 
 public:
 	GSTextureCacheSW();
