@@ -101,10 +101,17 @@ static void CDVD_INT(int eCycle)
 // test (which will cause the exception to be handled).
 static void cdvdSetIrq(uint id)
 {
+	/* Only assert the IOP interrupt on a rising edge of IntrStat; if the bit
+	 * is already set the interrupt line is still pending and re-issuing would
+	 * be a spurious double IRQ. */
+	if (!(cdvd.IntrStat & id))
+	{
+		iopIntcIrq(2);
+		psxSetNextBranchDelta(20);
+	}
+
 	cdvd.IntrStat       |= id;
 	cdvd.AbortRequested  = false;
-	iopIntcIrq(2);
-	psxSetNextBranchDelta(20);
 }
 
 static int mg_BIToffset(u8* buffer)

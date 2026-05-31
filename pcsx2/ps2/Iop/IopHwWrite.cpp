@@ -520,7 +520,7 @@ void iopHwWrite32_Page8( u32 addr, mem32_t val )
 					sio2.unknown2 = val;
 					break;
 				case (HW_SIO2_INTR & 0x0fff):
-					sio2.iStat = val;
+					sio2.iStat &= ~val;
 					break;
 				// Other SIO2 registers are read-only, no-ops on write.
 				default:

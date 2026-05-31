@@ -363,7 +363,12 @@ void Sio2::FullReset()
 
 void Sio2::Interrupt()
 {
-	iopIntcIrq(17);
+	/* Only raise the IOP interrupt on a rising edge; if iStat already has a
+	 * pending interrupt, re-issuing would be a spurious double IRQ. */
+	if (!iStat)
+		iopIntcIrq(17);
+
+	iStat |= 1;
 }
 
 void Sio2::SetCtrl(u32 value)
