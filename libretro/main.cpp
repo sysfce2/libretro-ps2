@@ -1256,6 +1256,10 @@ static void check_variables(bool first_run)
 				pad_settings[i].axis_invert_ry = -1;
 			}
 		}
+
+		snprintf(input_settings, sizeof(input_settings), "pcsx2_analog_mode%d", i + 1);
+		if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+			pad_settings[i].force_analog = !strcmp(var.value, "enabled");
 	}
 
 	update_option_visibility();

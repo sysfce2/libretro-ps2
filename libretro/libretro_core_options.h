@@ -991,6 +991,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "disabled"
    },
    {
+      "pcsx2_analog_mode1",
+      "Input > Port 1 > Start in Analog Mode",
+      "Port 1 > Start in Analog Mode",
+      "Start the controller in analog mode rather than digital. Some games (e.g. Ridge Racer V) boot the pad in digital and normally require pressing the controller's ANALOG button to enable the sticks; enable this to get analog controls from the start. Games that lock the controller mode are unaffected.",
+      NULL,
+      "input",
+      {
+         { "disabled", NULL },
+         { "enabled", NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
       "pcsx2_enable_rumble1",
       "Input > Port 1 > Rumble",
       "Port 1 > Rumble",
@@ -1070,6 +1084,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "x_axis", "Left/Right" },
          { "y_axis", "Up/Down" },
          { "all", "Up/Down and Left/Right" },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      "pcsx2_analog_mode2",
+      "Input > Port 2 > Start in Analog Mode",
+      "Port 2 > Start in Analog Mode",
+      "Start the controller in analog mode rather than digital. Some games (e.g. Ridge Racer V) boot the pad in digital and normally require pressing the controller's ANALOG button to enable the sticks; enable this to get analog controls from the start. Games that lock the controller mode are unaffected.",
+      NULL,
+      "input",
+      {
+         { "disabled", NULL },
+         { "enabled", NULL },
          { NULL, NULL },
       },
       "disabled"

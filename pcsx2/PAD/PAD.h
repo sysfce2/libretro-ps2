@@ -138,6 +138,11 @@ struct PadSettings
 	int axis_invert_ry = 1;
 	u16 axis_deadzone;
 	u16 button_deadzone;
+	// When set, the pad starts in analog mode instead of digital. Some games
+	// (e.g. Ridge Racer V) boot the pad in digital and only enable analog when
+	// the physical ANALOG button is pressed; libretro has no spare input to map
+	// that button to, so this option provides analog from the start instead.
+	bool force_analog = false;
 };
 
 extern PadSettings pad_settings[2];

@@ -166,6 +166,11 @@ static QueryInfo query;
 static Pad pads[2][4];
 static int slots[2] = {0, 0};
 
+// Set true on reset; cleared after the pad's initial mode has been forced to
+// analog (when the force_analog option is on). Ensures we set the *starting*
+// mode only, without overriding later game-driven mode changes.
+static bool force_analog_pending[2][4];
+
 extern retro_environment_t environ_cb;
 static retro_input_poll_t poll_cb;
 static retro_input_state_t input_cb;
@@ -499,7 +504,10 @@ s32 PADinit(void)
 {
 	for (int port = 0; port < 2; port++)
 		for (int slot = 0; slot < 4; slot++)
+		{
 			pads[port][slot].reset();
+			force_analog_pending[port][slot] = true;
+		}
 
 	query.port           = 0;
 	query.slot           = 0;
@@ -659,6 +667,19 @@ u8 PADpoll(u8 value)
 
 					const u32 ext_port = sioConvertPortAndSlotToPad(query.port, query.slot);
 					const u32 buttons  = button_mask[ext_port];
+
+					// "Start in analog mode" option: on the first read after
+					// reset, promote a still-digital, unlocked pad to analog.
+					// Done once (latch) so we set only the starting mode and do
+					// not override later game-driven mode changes.
+					if (force_analog_pending[query.port][query.slot])
+					{
+						force_analog_pending[query.port][query.slot] = false;
+						if (pad_settings[query.port].force_analog &&
+							pad->mode == MODE_DIGITAL && !pad->modeLock)
+							pad->mode = MODE_ANALOG;
+					}
+
 					if (!TEST_BIT(buttons, PAD_ANALOG) && !pad->modeLock)
 					{
 						switch (pad->mode)
