@@ -167,7 +167,13 @@ void MemoryCardProtocol::GetTerminator()
 	if (this->PS1Fail()) return;
 	fifoOut.push_back(0x2b);
 	fifoOut.push_back(mcd->term);
-	fifoOut.push_back(static_cast<u8>(Terminator::DEFAULT));
+	// MCMAN revisions check byte [3] and/or byte [4] for the terminator and
+	// expect to read back a valid terminator value. Older revisions only ever
+	// use 0x55, but newer ones set the terminator to another value (commonly
+	// 0x5a) via SetTerminator. Echo the terminator the card actually holds
+	// rather than a hardcoded default, so a game that set a custom terminator
+	// reads back the same value here.
+	fifoOut.push_back(mcd->term);
 }
 
 void MemoryCardProtocol::WriteData()
