@@ -174,6 +174,17 @@ vtlb_private::VTLBVirtual::VTLBVirtual(VTLBPhysical phys, u32 paddr, u32 vaddr)
 		value = phys.raw() - vaddr;
 }
 
+/* The TLB entry's PageMask register field is not a usable address mask; the
+ * bits above 12 encode the page size as a run of set bits. Convert it into an
+ * actual ((1 << (12 + n)) - 1) mask so the cacheable-range check below is
+ * correct. */
+__inline int ConvertPageMask(u32 PageMask)
+{
+	const u32 mask = (u32)__builtin_popcount(PageMask >> 13);
+
+	return (1 << (12 + mask)) - 1;
+}
+
 __inline int CheckCache(u32 addr)
 {
 	if (((cpuRegs.CP0.n.Config >> 16) & 0x1) != 0)
@@ -183,14 +194,14 @@ __inline int CheckCache(u32 addr)
 		{
 			if (((tlb[i].EntryLo1 & 0x38) >> 3) == 0x3)
 			{
-				mask = tlb[i].PageMask;
+				mask = ConvertPageMask(tlb[i].PageMask);
 
 				if ((addr >= tlb[i].PFN1) && (addr <= tlb[i].PFN1 + mask))
 					return true;
 			}
 			if (((tlb[i].EntryLo0 & 0x38) >> 3) == 0x3)
 			{
-				mask = tlb[i].PageMask;
+				mask = ConvertPageMask(tlb[i].PageMask);
 
 				if ((addr >= tlb[i].PFN0) && (addr <= tlb[i].PFN0 + mask))
 					return true;
