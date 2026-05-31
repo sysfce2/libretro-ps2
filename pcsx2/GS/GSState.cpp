@@ -4422,7 +4422,7 @@ void GSState::GetQuadBBoxWindowImpl(const GSVertex& v0, const GSVertex& v1, GSVe
 	const GSVector4 xy0 = GetXYWindow(v0);
 	const GSVector4 xy1 = GetXYWindow(v1);
 
-	xyout = xy0.min(xy1).xyzw(xy0.max(xy1));
+	xyout = xy0._min(xy1).xyzw(xy0._max(xy1));
 }
 
 template<u32 primclass, bool tme, bool fst>
@@ -4441,8 +4441,8 @@ void GSState::GetQuadBBoxWindowImpl(const GSVertex& v0, const GSVertex& v1, GSVe
 
 	if (!keep_tex_order)
 	{
-		xyout = xy0.min(xy1).xyzw(xy0.max(xy1));
-		texout = tex0.min(tex1).xyzw(tex0.max(tex1));
+		xyout = xy0._min(xy1).xyzw(xy0._max(xy1));
+		texout = tex0._min(tex1).xyzw(tex0._max(tex1));
 	}
 	else
 	{
