@@ -265,12 +265,10 @@ private:
 	u32 m_split_texture_shuffle_start_TBP = 0;
 
 	// Ported texture-shuffle classification state (upstream refactor 06616ec98).
-	// Introduced alongside the legacy m_texture_shuffle / m_copy_16bit_to_target_shuffle /
-	// m_same_group_texture_shuffle bools; detection/conversion are migrated onto this in
-	// later stages, after which the legacy bools are removed.
+	// Replaces the former m_texture_shuffle / m_copy_16bit_to_target_shuffle /
+	// m_same_group_texture_shuffle bools; consumers read this struct directly
+	// (operator bool(), real_16_bit_source, SameGroupShuffle()).
 	TextureShuffleInfo m_texture_shuffle_info;
-	bool m_process_texture = false;
-	bool m_downscale_source = false;
 	u32 m_split_texture_shuffle_fbw = 0;
 
 	u32 m_last_channel_shuffle_fbmsk = 0;
