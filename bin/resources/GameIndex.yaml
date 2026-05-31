@@ -31297,8 +31297,6 @@ SLKA-35004:
   name: "Sakura Wars 5 So Long My Love"
   region: "NTSC-K"
   compat: 5
-  gsHWFixes:
-    getSkipCount: "GSC_SakuraWarsSoLongMyLove"
 SLKA-35005:
   name: "Jin Samguk Mussang 5 - Special"
   region: "NTSC-K"
@@ -62467,8 +62465,6 @@ SLUS-21927:
   name: "Sakura Wars - So Long, My Love [English - Disc 1]"
   region: "NTSC-U"
   compat: 5
-  gsHWFixes:
-    getSkipCount: "GSC_SakuraWarsSoLongMyLove"
 SLUS-21928:
   name: "Scooby-Doo! and the Spooky Swamp"
   region: "NTSC-U"
@@ -62485,8 +62481,6 @@ SLUS-21930:
   name: "Sakura Wars - So Long, My Love [Japanese - Disc 2]"
   region: "NTSC-U"
   compat: 5
-  gsHWFixes:
-    getSkipCount: "GSC_SakuraWarsSoLongMyLove"
 SLUS-21931:
   name: "Disney/Pixar Toy Story 3"
   region: "NTSC-U"
