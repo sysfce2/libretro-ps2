@@ -274,9 +274,15 @@ bool GSHwHack::GSC_Tekken5(GSRendererHW& r, int& skip)
 		}
 		else if (RZTST == 1 && RTME && (RFBP == 0x02bc0 || RFBP == 0x02be0 || RFBP == 0x02d00 || RFBP == 0x03480 || RFBP == 0x034a0) && RFPSM == RTPSM && RTBP0 == 0x00000 && RTPSM == PSMCT32)
 		{
-			// The moving display effect(flames) is not emulated properly in the entire screen so let's remove the effect in the stage: Burning Temple. Related to half screen bottom issue.
-			// Fixes black lines in the stage: Burning Temple - caused by upscaling. Note the black lines can also be fixed with Merge Sprite hack.
-			skip = 2;
+			// The moving display effect (flames) on the Burning Temple stage is drawn as two
+			// halves whose alignment breaks under upscaling, producing black lines / half-screen
+			// bottom issues. Rather than drop the effect entirely (which removes the flames),
+			// realign the two halves by nudging every other vertex up by half a pixel (0x8 in
+			// 1/16 subpixel units), as upstream does for the same Namco-engine heat haze. This
+			// keeps the effect visible and correct instead of skipping it.
+			GSVertex* v = &r.m_vertex.buff[0];
+			for (u32 i = 0; i < r.m_index.tail; i += 2)
+				v[i].XYZ.Y -= 0x8;
 		}
 	}
 
