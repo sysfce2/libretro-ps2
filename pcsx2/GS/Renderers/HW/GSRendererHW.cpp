@@ -705,6 +705,418 @@ void GSRendererHW::ConvertSpriteTextureShuffle(u32& process_rg, u32& process_ba,
 	}
 }
 
+
+/* --- Texture-shuffle quad conversion (ported from upstream refactor 06616ec98). ---
+ * New templated ConvertSpriteTextureShuffleImpl + ConvertSpriteTextureShuffle(rt,tex)
+ * overload, consuming m_texture_shuffle_info. Defined alongside the legacy
+ * ConvertSpriteTextureShuffle(process_rg,...) overload above; NOT yet called (stage 3b
+ * rewires the call site onto this path). GL_*/pxFail dropped; triangle path relies on
+ * the stage 2b sprite-only stub. */
+template<u32 primclass, bool fst>
+void GSRendererHW::ConvertSpriteTextureShuffleImpl(GSTextureCache::Target* rt, GSTextureCache::Source* tex)
+{
+	const GSVector4i xyof = m_context->scissor.xyof.xyxy();
+	const float tw = static_cast<float>(1 << m_cached_ctx.TEX0.TW);
+	const float th = static_cast<float>(1 << m_cached_ctx.TEX0.TH);
+	const bool bilinear = m_vt.IsRealLinear();
+	
+	// Copy the attributes from the provoking vertex.
+	GSVertex v_default = primclass == GS_SPRITE_CLASS ? m_vertex.buff[1] : m_vertex.buff[2];
+
+	const auto SetTexCoords = [&](float u, float v, GSVertex& vtx_out) {
+		if constexpr (fst)
+		{
+			vtx_out.U = static_cast<u32>(u * 16.0f);
+			vtx_out.V = static_cast<u32>(v * 16.0f);
+		}
+		else
+		{
+			vtx_out.ST.S = u / tw;
+			vtx_out.ST.T = v / th;
+			vtx_out.RGBAQ.Q = 1.0f;
+		}
+	};
+
+	const auto SetPosCoords = [&](float x, float y, GSVertex& vtx_out) {
+		vtx_out.XYZ.X = xyof.x + static_cast<u32>(x * 16.0f);
+		vtx_out.XYZ.Y = xyof.y + static_cast<u32>(y * 16.0f);
+	};
+
+	const auto WriteQuad = [&](const GSVector4& xy, GSVector4 uv, GSVertex*& vout, u16*& iout) {
+		if (bilinear)
+		{
+			// Translate to texel center for bilinear.
+			uv += GSVector4(0.5f);
+		}
+
+		if constexpr (primclass == GS_SPRITE_CLASS)
+		{
+			vout[0] = v_default;
+			vout[1] = v_default;
+
+			SetPosCoords(xy.x, xy.y, vout[0]);
+			SetPosCoords(xy.z, xy.w, vout[1]);
+
+			SetTexCoords(uv.x, uv.y, vout[0]);
+			SetTexCoords(uv.z, uv.w, vout[1]);
+
+			iout[0] = 0;
+			iout[1] = 1;
+
+			vout += 2;
+			iout += 2;
+		}
+		else
+		{
+			vout[0] = v_default;
+			vout[1] = v_default;
+			vout[2] = v_default;
+			vout[3] = v_default;
+
+			SetPosCoords(xy.x, xy.y, vout[0]);
+			SetPosCoords(xy.z, xy.y, vout[1]);
+			SetPosCoords(xy.x, xy.w, vout[2]);
+			SetPosCoords(xy.z, xy.w, vout[3]);
+
+			SetTexCoords(uv.x, uv.y, vout[0]);
+			SetTexCoords(uv.z, uv.y, vout[1]);
+			SetTexCoords(uv.x, uv.w, vout[2]);
+			SetTexCoords(uv.z, uv.w, vout[3]);
+
+			iout[0] = 0;
+			iout[1] = 1;
+			iout[2] = 2;
+			iout[3] = 1;
+			iout[4] = 2;
+			iout[5] = 3;
+
+			vout += 4;
+			iout += 6;
+		}
+	};
+
+	// Compensates for the 8 pixel offsetting done by the shuffle to write to specific channels.
+	// Some games also add small offsets to compensate for GS rounding errors with nearest.
+	const auto ShiftAlignRect = [&](const GSVector4& rf) {
+		GSVector4i ri;
+		
+		const float rf_w = rf.z - rf.x;
+		if (m_texture_shuffle_info.type != TextureShuffleType::TwoPixel || rf_w >= 8.0f)
+		{
+			// Snap to nearest column.
+			const GSVector4 rf_snapped = (rf / 8.0f).round<Round_NearestInt>() * 8.0f;
+			ri = GSVector4i(rf_snapped);
+			
+			// Offset in case there is a vertical shift.
+			const GSVector4 rf_offset = (rf - rf_snapped).round<Round_Truncate>();
+			ri = ri.blend32<0xA>(ri + GSVector4i(rf_offset));
+		}
+		else
+		{
+			// Powerdrome two pixel shuffle: rects are only 1 or 2 pixels so use a different
+			// heuristic to adjust the coords. Should not be used for other shuffles.
+			ri = GSVector4i(rf.floor()) + GSVector4i(0, 0, 1, 1);
+		}
+
+		const int w = ri.width();
+		if (w >= 8 && (w & 8))
+		{
+			ri = ri.ralign<Align_Outside>(GSVector2i(16, 1));
+		}
+		else if (ri.x & 8)
+		{
+			ri.x -= 8;
+			ri.z -= 8;
+		}
+		else if (ri.z & 8)
+		{
+			ri.x += 8;
+			ri.z += 8;
+		}
+		return ri;
+	};
+
+	m_r = ShiftAlignRect(m_vt.m_min.p.xyxy(m_vt.m_max.p));
+	GSVector4i tex_r = ShiftAlignRect(m_vt.m_min.t.xyxy(m_vt.m_max.t));
+	GSVector4i scissor_r = ShiftAlignRect(GSVector4(m_context->scissor.in));
+
+	
+		m_r.x ,m_r.y, m_r.z, m_r.w, tex_r.x, tex_r.y, tex_r.z, tex_r.w,
+		scissor_r.x, scissor_r.y, scissor_r.z, scissor_r.w);
+
+	// Heuristics for determining the region to use for the shuffle.
+	bool half_x = true;
+	bool half_y = true;
+	bool half_u = true;
+	bool half_v = true;
+
+	if (m_texture_shuffle_info.real_16_bit_source)
+	{
+		half_u = false;
+		half_v = false;
+	}
+
+	if (m_split_texture_shuffle_pages > 0 ||
+		m_texture_shuffle_info.type == TextureShuffleType::TwoPixel ||
+		m_texture_shuffle_info.type == TextureShuffleType::HackShuffle)
+	{
+		half_x = false;
+		half_y = false;
+		half_u = false;
+		half_v = false;
+	}
+	else if (m_texture_shuffle_info.type == TextureShuffleType::GappedSwizzle)
+	{
+		// Currently, this shuffle is done with the NFS CRC hack.
+		// It is a split texture shuffle, but the draws are skipped with the hack instead of
+		// being combined in the usual way, so we need to adjust the draw rect here.
+		half_x = false;
+		half_y = false;
+		half_u = false;
+		half_v = false;
+
+		m_r = rt->GetUnscaledRect();
+		tex_r = tex->GetUnscaledRect();
+		scissor_r = m_r;
+
+	}
+	else if (m_texture_shuffle_info.type == TextureShuffleType::Swizzle ||
+	    m_texture_shuffle_info.type == TextureShuffleType::SwizzleTex32)
+	{
+		if (m_cached_ctx.FRAME.FBW == rt->m_TEX0.TBW * 2)
+		{
+			half_y = false;
+		}
+		else
+		{
+			half_x = false;
+		}
+
+		half_u = false;
+		half_v = false;
+	}
+	else if (m_cached_ctx.TEX0.TBP0 != m_cached_ctx.FRAME.Block())
+	{
+		// Handle non-recursive draws.
+		// No super source of truth here, since the width can get batted around, the valid is probably our best bet.
+		// Dogs will reuse the Z in a different size format for a completely unrelated draw with an FBW of 2,
+		// then go back to using it in full width.
+
+		const bool tex_tbw_is_wrong =
+			tex->m_target &&
+			(static_cast<int>(tex->m_from_target_TEX0.TBW * 64) < tex->m_from_target->m_valid.z / 2);
+
+		const u32 draw_bw = std::max(m_r.z / 64, 1);
+
+		const bool single_direction_doubled =
+			((m_r.w > rt->m_valid.w) != (m_r.z > rt->m_valid.z)) ||
+			(IsSinglePageDraw() && m_r.height() > 32);
+
+		if (tex_tbw_is_wrong || (rt->m_TEX0.TBW % draw_bw) == 0 || single_direction_doubled)
+		{
+			u32 max_tex_draw_width = std::min(m_r.z, 1 << m_cached_ctx.TEX0.TW);
+
+			const u32 clamp_minu = m_context->CLAMP.MINU;
+			const u32 clamp_maxu = m_context->CLAMP.MAXU;
+
+			switch (m_context->CLAMP.WMS)
+			{
+				case CLAMP_REGION_CLAMP:
+					max_tex_draw_width = std::min(max_tex_draw_width, clamp_maxu);
+					break;
+				case CLAMP_REGION_REPEAT:
+					max_tex_draw_width = std::min(max_tex_draw_width, (clamp_maxu | clamp_minu));
+					break;
+				default:
+					break;
+			}
+
+			const int width_diff =
+				static_cast<int>(m_env.CTXT[m_env.PRIM.CTXT].TEX0.TBW) -
+				static_cast<int>((m_cached_ctx.FRAME.FBW + 1) >> 1);
+			
+			// We can check the future for a clue as this can be more accurate,
+			// be careful of different draws like channel shuffles or single page draws.
+			if (m_env.PRIM.TME && m_env.CTXT[m_env.PRIM.CTXT].TEX0.TBP0 == m_cached_ctx.FRAME.Block() &&
+				GSLocalMemory::m_psm[m_env.CTXT[m_env.PRIM.CTXT].TEX0.PSM].bpp == 32 && width_diff >= 0)
+			{
+				// width_diff will be zero is both are BW == 1, so be careful of that.
+				const bool keep_width = width_diff > 0 || (m_cached_ctx.FRAME.FBW == 1 && width_diff == 0);
+
+				// Draw is double width and the draw is twice the width of the next draws texture.
+				if ((!keep_width && max_tex_draw_width >= m_cached_ctx.FRAME.FBW * 64) ||
+					(single_direction_doubled && m_r.z >= rt->m_valid.z * 2))
+				{
+					half_v = false;
+					half_y = false;
+				}
+				else
+				{
+					half_u = false;
+					half_x = false;
+				}
+			}
+			else
+			{
+				const u32 tex_width =
+					tex_tbw_is_wrong ? tex->m_from_target->m_valid.z :
+					tex->m_target ? tex->m_from_target_TEX0.TBW * 64 :
+					max_tex_draw_width;
+
+				const u32 tex_tbw = tex->m_target ? tex->m_from_target_TEX0.TBW : tex->m_TEX0.TBW;
+
+				if ((m_cached_ctx.TEX0.TBW * 64 >= tex_width * 2) && (tex_tbw != m_cached_ctx.TEX0.TBW))
+				{
+					half_v = false;
+					half_y = false;
+				}
+				else
+				{
+					half_u = false;
+					half_x = false;
+				}
+			}
+		}
+		else
+		{
+			half_v = false;
+			half_y = false;
+			half_u = false;
+			half_x = false;
+		}
+	}
+	else
+	{
+		// Handle recursive draws.
+
+		const GSVector2i& frame_pgs = GSLocalMemory::m_psm[m_cached_ctx.FRAME.PSM].pgs;
+
+		const u32 draw_page_width = m_r.width() / frame_pgs.x;
+
+		if (draw_page_width != 1 && (m_r.w <= rt->m_valid.w) &&
+			((m_r.z > static_cast<int>(m_cached_ctx.FRAME.FBW * 64)) || (rt->m_TEX0.TBW < m_cached_ctx.FRAME.FBW)))
+		{
+			half_y = false;
+			half_v = false;
+		}
+		else
+		{
+			half_x = false;
+			half_u = false;
+		}
+	}
+
+
+	if (half_x)
+	{
+		m_r.x /= 2;
+		m_r.z /= 2;
+		scissor_r.x /= 2;
+		scissor_r.z /= 2;
+	}
+
+	if (half_y)
+	{
+		m_r.y /= 2;
+		m_r.w /= 2;
+		scissor_r.y /= 2;
+		scissor_r.w /= 2;
+	}
+
+	if (half_u)
+	{
+		tex_r.x /= 2;
+		tex_r.z /= 2;
+	}
+
+	if (half_v)
+	{
+		tex_r.y /= 2;
+		tex_r.w /= 2;
+	}
+
+	// Special case used in Call of Duty - World at War where it doubles the height and halves the width,
+	// but the height is double doubled. Check the height of the original texture,
+	// if it's half of the draw height, then make it wide instead.
+	if (half_v && tex->m_from_target && m_cached_ctx.TEX0.TBW == m_cached_ctx.FRAME.FBW &&
+		tex->m_from_target->m_TEX0.TBW == (m_cached_ctx.TEX0.TBW * 2) &&
+		static_cast<int>(m_cached_ctx.TEX0.TBW * 64) == m_r.z &&
+		m_r.w > tex->m_from_target->m_valid.w)
+	{
+		m_r.x *= 2;
+		m_r.z *= 2;
+		m_r.y /= 2;
+		m_r.w /= 2;
+
+		scissor_r.x *= 2;
+		scissor_r.z *= 2;
+		scissor_r.y /= 2;
+		scissor_r.w /= 2;
+
+		tex_r.x *= 2;
+		tex_r.z *= 2;
+		tex_r.y /= 2;
+		tex_r.w /= 2;
+
+	}
+
+		m_r.x, m_r.y, m_r.z, m_r.w, tex_r.x, tex_r.y, tex_r.z, tex_r.w,
+		scissor_r.x, scissor_r.y, scissor_r.z, scissor_r.w);
+
+	m_vt.m_min.p.x = static_cast<float>(m_r.x);
+	m_vt.m_min.p.y = static_cast<float>(m_r.y);
+	m_vt.m_max.p.x = static_cast<float>(m_r.z);
+	m_vt.m_max.p.y = static_cast<float>(m_r.w);
+
+	m_vt.m_min.t.x = static_cast<float>(tex_r.x);
+	m_vt.m_min.t.y = static_cast<float>(tex_r.y);
+	m_vt.m_max.t.x = static_cast<float>(tex_r.z);
+	m_vt.m_max.t.y = static_cast<float>(tex_r.w);
+
+	m_context->scissor.in = scissor_r;
+
+	m_index.tail = 0;
+	m_vertex.head = m_vertex.tail = m_vertex.next = 0;
+
+	GSVertex* vout = m_vertex.buff;
+	u16* iout = m_index.buff;
+
+	WriteQuad(GSVector4(m_r), GSVector4(tex_r), vout, iout);
+
+	m_index.tail = iout - m_index.buff;
+	m_vertex.head = m_vertex.tail = m_vertex.next = vout - m_vertex.buff;
+}
+
+
+void GSRendererHW::ConvertSpriteTextureShuffle(GSTextureCache::Target* rt, GSTextureCache::Source* tex)
+{
+	if (m_vt.m_primclass == GS_SPRITE_CLASS)
+	{
+		if (PRIM->FST)
+		{
+			ConvertSpriteTextureShuffleImpl<GS_SPRITE_CLASS, true>(rt, tex);
+		}
+		else
+		{
+			ConvertSpriteTextureShuffleImpl<GS_SPRITE_CLASS, false>(rt, tex);
+		}
+	}
+	else if (m_vt.m_primclass == GS_TRIANGLE_CLASS)
+	{
+		if (PRIM->FST)
+		{
+			ConvertSpriteTextureShuffleImpl<GS_TRIANGLE_CLASS, true>(rt, tex);
+		}
+		else
+		{
+			ConvertSpriteTextureShuffleImpl<GS_TRIANGLE_CLASS, false>(rt, tex);
+		}
+	}
+	else
+	{
+	}
+}
+
 GSVector4 GSRendererHW::RealignTargetTextureCoordinate(const GSTextureCache::Source* tex)
 {
 	if (	   GSConfig.UserHacks_HalfPixelOffset <= 1 
@@ -911,6 +1323,16 @@ GSVector2i GSRendererHW::GetTargetSize(const GSTextureCache::Source* tex)
 	const GSVector2i valid_size = GetValidSize(tex);
 
 	return g_texture_cache->GetTargetSize(m_cached_ctx.FRAME.Block(), m_cached_ctx.FRAME.FBW, m_cached_ctx.FRAME.PSM, valid_size.x, valid_size.y);
+}
+
+bool GSRendererHW::IsSinglePageDraw() const
+{
+	const GSVector2i& frame_pgs = GSLocalMemory::m_psm[m_cached_ctx.FRAME.PSM].pgs;
+
+	if (m_r.width() <= frame_pgs.x && m_r.height() <= frame_pgs.y)
+		return true;
+
+	return false;
 }
 
 bool GSRendererHW::IsPossibleChannelShuffle() const

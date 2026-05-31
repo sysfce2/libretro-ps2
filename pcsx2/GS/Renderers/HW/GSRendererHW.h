@@ -124,6 +124,7 @@ private:
 
 	void SetTCOffset();
 
+	bool IsSinglePageDraw() const;
 	bool IsPossibleChannelShuffle() const;
 	bool NextDrawMatchesShuffle() const;
 	bool IsSplitTextureShuffle(GSTextureCache::Target* rt);
@@ -311,6 +312,13 @@ public:
 	bool VerifyIndices();
 	void ExpandLineIndices();
 	void ConvertSpriteTextureShuffle(u32& process_rg, u32& process_ba, bool& shuffle_across, GSTextureCache::Target* rt, GSTextureCache::Source* tex);
+
+	/* New texture-shuffle quad conversion (ported from upstream refactor
+	 * 06616ec98), consuming m_texture_shuffle_info. Coexists with the legacy
+	 * overload above until stage 4; not yet called (stage 3b rewires). */
+	template<u32 primclass, bool fst>
+	void ConvertSpriteTextureShuffleImpl(GSTextureCache::Target* rt, GSTextureCache::Source* tex);
+	void ConvertSpriteTextureShuffle(GSTextureCache::Target* rt, GSTextureCache::Source* tex);
 
 	/* Texture-shuffle detection (ported from upstream refactor 06616ec98).
 	 * Populates m_texture_shuffle_info; not yet consumed (stage 3 rewires
