@@ -400,6 +400,11 @@ void retro_set_input_state(retro_input_state_t cb)
 	input_cb = cb;
 }
 
+retro_input_state_t PADGetInputStateCallback(void)
+{
+	return input_cb;
+}
+
 void retro_set_controller_port_device(unsigned port, unsigned device)
 {
 	if (pad_type[port] != (int)device)

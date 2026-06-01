@@ -258,6 +258,7 @@ SOURCES_CXX += \
 	$(LRPS2_DIR)/USB/libretro-usb/desc.cpp \
 	$(LRPS2_DIR)/USB/libretro-usb/hid.cpp \
 	$(LRPS2_DIR)/USB/libretro-usb/input-keymap-qcode-to-qnum.cpp \
+	$(LRPS2_DIR)/USB/libretro-usb/usb-hid.cpp \
 	$(LRPS2_DIR)/USB/libretro-usb/usb-ohci.cpp \
 	$(LRPS2_DIR)/USB/shared/ringbuffer.cpp
 

@@ -81,6 +81,16 @@ namespace USB
 
 // ---------------------------------------------------------------------
 
+/* libretro USB port device selection (driven by core options). */
+enum UsbPortDevice
+{
+	USB_DEV_NONE = 0,
+	USB_DEV_KEYBOARD,
+	USB_DEV_MOUSE,
+};
+
+void USBSetPortDevice(unsigned port, int device);
+
 void USBinit(void);
 void USBasync(u32 cycles);
 void USBshutdown(void);

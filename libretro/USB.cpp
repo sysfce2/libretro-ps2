@@ -17,7 +17,10 @@
 
 #include "../pcsx2/USB/USB.h"
 #include "../pcsx2/USB/libretro-usb/USBinternal.h"
+#include "../pcsx2/USB/libretro-usb/usb-hid.h"
 #include "../pcsx2/SaveState.h"
+
+#include "libretro.h"
 
 /* IOP clock, 36.864 MHz. */
 #define PSXCLK 36864000
@@ -32,6 +35,60 @@ s64 g_usb_last_cycle = 0;
 static OHCIState* s_qemu_ohci   = nullptr;
 static s64        s_usb_clocks  = 0;
 static s64        s_usb_remaining = 0;
+
+static int        s_port_device[USB::NUM_PORTS] = { USB_DEV_NONE, USB_DEV_NONE };
+static USBDevice* s_usb_device[USB::NUM_PORTS]  = { nullptr, nullptr };
+
+/* From PAD.cpp - the libretro input_state callback the frontend installed. */
+extern retro_input_state_t PADGetInputStateCallback(void);
+
+/* Set the device type for a USB port (from a core option). Takes effect on
+ * the next USBopen()/USBreset(). */
+void USBSetPortDevice(unsigned port, int device)
+{
+	if (port < USB::NUM_PORTS)
+		s_port_device[port] = device;
+}
+
+static OHCIPort& GetOHCIPort(u32 port)
+{
+	const u32 rhport = (port < s_qemu_ohci->num_ports) ? port : 0;
+	return s_qemu_ohci->rhport[rhport];
+}
+
+static void USBCreateDevice(u32 port)
+{
+	USBDevice* dev = nullptr;
+	switch (s_port_device[port])
+	{
+		case USB_DEV_KEYBOARD:
+			dev = usb_hid::usb_hid_create_kbd(port);
+			break;
+		case USB_DEV_MOUSE:
+			dev = usb_hid::usb_hid_create_mouse(port);
+			break;
+		default:
+			return;
+	}
+	if (!dev)
+		return;
+
+	GetOHCIPort(port).port.dev = dev;
+	dev->attached = true;
+	usb_attach(&GetOHCIPort(port).port);
+	s_usb_device[port] = dev;
+}
+
+static void USBDestroyDevice(u32 port)
+{
+	USBDevice* dev = s_usb_device[port];
+	if (!dev)
+		return;
+	if (dev->klass.unrealize)
+		dev->klass.unrealize(dev);
+	GetOHCIPort(port).port.dev = nullptr;
+	s_usb_device[port] = nullptr;
+}
 
 int usb_get_ticks_per_second(void)
 {
@@ -60,11 +117,16 @@ bool USBopen(void)
 	s_usb_clocks     = 0;
 	s_usb_remaining  = 0;
 	g_usb_last_cycle = 0;
+
+	for (u32 port = 0; port < USB::NUM_PORTS; port++)
+		USBCreateDevice(port);
 	return true;
 }
 
 void USBclose(void)
 {
+	for (u32 port = 0; port < USB::NUM_PORTS; port++)
+		USBDestroyDevice(port);
 	if (s_qemu_ohci)
 	{
 		free(s_qemu_ohci);
@@ -85,6 +147,18 @@ void USBasync(u32 cycles)
 {
 	if (!s_qemu_ohci)
 		return;
+
+	/* Pump one frame of frontend keyboard/mouse input into attached HID
+	 * devices before advancing the controller. */
+	{
+		retro_input_state_t input_cb = PADGetInputStateCallback();
+		u32 port;
+		for (port = 0; port < USB::NUM_PORTS; port++)
+		{
+			if (s_usb_device[port])
+				usb_hid::usb_hid_update(s_usb_device[port], input_cb, port);
+		}
+	}
 
 	s_usb_remaining += cycles;
 	s_usb_clocks    += s_usb_remaining;
