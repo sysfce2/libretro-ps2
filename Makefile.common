@@ -251,6 +251,16 @@ SOURCES_CXX += \
 # pcsx2/PAD
 SOURCES_CXX += $(LRPS2_DIR)/PAD/PAD.cpp
 
+# pcsx2/USB (OHCI host-controller core + HID device model)
+SOURCES_CXX += \
+	$(LRPS2_DIR)/USB/libretro-usb/bus.cpp \
+	$(LRPS2_DIR)/USB/libretro-usb/core.cpp \
+	$(LRPS2_DIR)/USB/libretro-usb/desc.cpp \
+	$(LRPS2_DIR)/USB/libretro-usb/hid.cpp \
+	$(LRPS2_DIR)/USB/libretro-usb/input-keymap-qcode-to-qnum.cpp \
+	$(LRPS2_DIR)/USB/libretro-usb/usb-ohci.cpp \
+	$(LRPS2_DIR)/USB/shared/ringbuffer.cpp
+
 # pcsx2/ps2
 SOURCES_CXX += \
 	$(LRPS2_DIR)/ps2/BiosTools.cpp \
