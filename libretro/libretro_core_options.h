@@ -155,36 +155,6 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "disabled"
    },
    {
-      "pcsx2_usb_port1",
-      "Input > USB Port 1 Device (Restart)",
-      "USB Port 1 Device (Restart)",
-      "Emulate a USB device on port 1. A few games (e.g. Dirge of Cerberus) read a USB keyboard and/or mouse directly.",
-      NULL,
-      "input",
-      {
-         { "None", NULL },
-         { "Keyboard", NULL },
-         { "Mouse", NULL },
-         { NULL, NULL },
-      },
-      "None"
-   },
-   {
-      "pcsx2_usb_port2",
-      "Input > USB Port 2 Device (Restart)",
-      "USB Port 2 Device (Restart)",
-      "Emulate a USB device on port 2. A few games (e.g. Dirge of Cerberus) read a USB keyboard and/or mouse directly.",
-      NULL,
-      "input",
-      {
-         { "None", NULL },
-         { "Keyboard", NULL },
-         { "Mouse", NULL },
-         { NULL, NULL },
-      },
-      "None"
-   },
-   {
       "pcsx2_shared_memory_cards",
       "System > Shared Memory Cards (Restart)",
       "Shared Memory Cards (Restart)",

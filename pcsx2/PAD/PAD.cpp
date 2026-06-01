@@ -28,6 +28,7 @@
 #include "../Frontend/InputManager.h"
 #include "../Host.h"
 #include "../Sio.h"
+#include "../USB/USB.h"
 
 #define MODE_DIGITAL	0x41
 #define MODE_ANALOG	0x73
@@ -316,14 +317,16 @@ namespace Input
 			{},
 		};
 
-		static const struct retro_controller_description ds2_desc[] = {
-			{ "DualShock 2", RETRO_DEVICE_JOYPAD},
+		static const struct retro_controller_description port_devices[] = {
+			{ "DualShock 2", RETRO_DEVICE_JOYPAD },
+			{ "USB Keyboard", RETRO_DEVICE_KEYBOARD },
+			{ "USB Mouse", RETRO_DEVICE_MOUSE },
 			{},
 		};
 
 		static const struct retro_controller_info ports[] = {
-			{ ds2_desc, sizeof(ds2_desc) / sizeof(*ds2_desc) },
-			{ ds2_desc, sizeof(ds2_desc) / sizeof(*ds2_desc) },
+			{ port_devices, sizeof(port_devices) / sizeof(*port_devices) },
+			{ port_devices, sizeof(port_devices) / sizeof(*port_devices) },
 			{},
 		};
 
@@ -418,9 +421,21 @@ void retro_set_controller_port_device(unsigned port, unsigned device)
 		{
 			case RETRO_DEVICE_JOYPAD:
 				si->SetStringValue(section, "Type", "DualShock2");
+				USBSetPortDevice(port, USB_DEV_NONE);
+				break;
+			case RETRO_DEVICE_KEYBOARD:
+				/* USB HID keyboard takes the slot; no SIO pad. */
+				si->SetStringValue(section, "Type", "None");
+				USBSetPortDevice(port, USB_DEV_KEYBOARD);
+				break;
+			case RETRO_DEVICE_MOUSE:
+				/* USB HID mouse takes the slot; no SIO pad. */
+				si->SetStringValue(section, "Type", "None");
+				USBSetPortDevice(port, USB_DEV_MOUSE);
 				break;
 			default:
 				si->SetStringValue(section, "Type", "None");
+				USBSetPortDevice(port, USB_DEV_NONE);
 				break;
 		}
 

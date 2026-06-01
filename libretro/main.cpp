@@ -420,24 +420,6 @@ static void check_variables(bool first_run)
 			bool fast_cdvd = !strcmp(var.value, "enabled");
 			s_settings_interface.SetBoolValue("EmuCore/Speedhacks", "fastCDVD", fast_cdvd);
 		}
-
-		{
-			static const char* const usb_port_keys[2] = { "pcsx2_usb_port1", "pcsx2_usb_port2" };
-			unsigned p;
-			for (p = 0; p < 2; p++)
-			{
-				int dev = USB_DEV_NONE;
-				var.key = usb_port_keys[p];
-				if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-				{
-					if (!strcmp(var.value, "Keyboard"))
-						dev = USB_DEV_KEYBOARD;
-					else if (!strcmp(var.value, "Mouse"))
-						dev = USB_DEV_MOUSE;
-				}
-				USBSetPortDevice(p, dev);
-			}
-		}
 	}
 
 	if (setting_plugin_type == PLUGIN_PGS)

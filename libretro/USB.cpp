@@ -136,11 +136,23 @@ void USBclose(void)
 
 void USBreset(void)
 {
+	u32 port;
+
 	s_usb_clocks     = 0;
 	s_usb_remaining  = 0;
 	g_usb_last_cycle = 0;
-	if (s_qemu_ohci)
-		ohci_hard_reset(s_qemu_ohci);
+	if (!s_qemu_ohci)
+		return;
+
+	/* Reconcile attached devices with the current per-port selection, so a
+	 * device-type change applied while running takes effect on reset. */
+	for (port = 0; port < USB::NUM_PORTS; port++)
+		USBDestroyDevice(port);
+
+	ohci_hard_reset(s_qemu_ohci);
+
+	for (port = 0; port < USB::NUM_PORTS; port++)
+		USBCreateDevice(port);
 }
 
 void USBasync(u32 cycles)
