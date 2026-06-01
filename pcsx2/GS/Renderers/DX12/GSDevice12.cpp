@@ -734,7 +734,7 @@ void GSDevice12::LookupNativeFormat(GSTexture::Format format, DXGI_FORMAT* d3d_f
 			{DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM,
 				DXGI_FORMAT_UNKNOWN}, // Color
 			{DXGI_FORMAT_R16G16B16A16_UNORM, DXGI_FORMAT_R16G16B16A16_UNORM, DXGI_FORMAT_R16G16B16A16_UNORM,
-				DXGI_FORMAT_UNKNOWN}, // HDRColor
+				DXGI_FORMAT_UNKNOWN}, // ColorClip
 			{DXGI_FORMAT_D32_FLOAT_S8X24_UINT, DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS, DXGI_FORMAT_UNKNOWN,
 				DXGI_FORMAT_D32_FLOAT_S8X24_UINT}, // DepthStencil
 			{DXGI_FORMAT_A8_UNORM, DXGI_FORMAT_A8_UNORM, DXGI_FORMAT_A8_UNORM, DXGI_FORMAT_UNKNOWN}, // UNorm8
@@ -1704,9 +1704,9 @@ bool GSDevice12::CompileConvertPipelines()
 					return false;
 			}
 		}
-		else if (i == ShaderConvert::HDR_INIT || i == ShaderConvert::HDR_RESOLVE)
+		else if (i == ShaderConvert::COLCLIP_INIT || i == ShaderConvert::COLCLIP_RESOLVE)
 		{
-			const bool is_setup = i == ShaderConvert::HDR_INIT;
+			const bool is_setup = i == ShaderConvert::COLCLIP_INIT;
 			std::array<ComPtr<ID3D12PipelineState>, 2>& arr = is_setup ? m_hdr_setup_pipelines : m_hdr_finish_pipelines;
 			for (u32 ds = 0; ds < 2; ds++)
 			{
@@ -1920,8 +1920,8 @@ const ID3DBlob* GSDevice12::GetTFXPixelShader(const GSHWDrawConfig::PSSelector& 
 	sm.AddMacro("PS_TFX", sel.tfx);
 	sm.AddMacro("PS_TCC", sel.tcc);
 	sm.AddMacro("PS_DATE", sel.date);
-	sm.AddMacro("PS_ATST", sel.atst);
-	sm.AddMacro("PS_AFAIL", sel.afail);
+	sm.AddMacro("PS_ATST", static_cast<u32>(sel.atst));
+	sm.AddMacro("PS_AFAIL", static_cast<u32>(sel.afail));
 	sm.AddMacro("PS_FOG", sel.fog);
 	sm.AddMacro("PS_IIP", sel.iip);
 	sm.AddMacro("PS_BLEND_HW", sel.blend_hw);
@@ -1944,7 +1944,7 @@ const ID3DBlob* GSDevice12::GetTFXPixelShader(const GSHWDrawConfig::PSSelector& 
 	sm.AddMacro("PS_DST_FMT", sel.dst_fmt);
 	sm.AddMacro("PS_DEPTH_FMT", sel.depth_fmt);
 	sm.AddMacro("PS_PAL_FMT", sel.pal_fmt);
-	sm.AddMacro("PS_HDR", sel.hdr);
+	sm.AddMacro("PS_COLCLIP_HW", sel.colclip_hw);
 	sm.AddMacro("PS_RTA_CORRECTION", sel.rta_correction);
 	sm.AddMacro("PS_RTA_SRC_CORRECTION", sel.rta_source_correction);
 	sm.AddMacro("PS_COLCLIP", sel.colclip);
@@ -2002,7 +2002,7 @@ GSDevice12::ComPtr<ID3D12PipelineState> GSDevice12::CreateTFXPipeline(const Pipe
 	{
 		const GSTexture::Format format = IsDATEModePrimIDInit(p.ps.date) ?
 			GSTexture::Format::PrimID :
-			(p.ps.hdr ? GSTexture::Format::HDRColor : GSTexture::Format::Color);
+			(p.ps.colclip_hw ? GSTexture::Format::ColorClip : GSTexture::Format::Color);
 
 		DXGI_FORMAT native_format;
 		LookupNativeFormat(format, nullptr, nullptr, &native_format, nullptr);
@@ -2854,7 +2854,7 @@ void GSDevice12::RenderHW(GSHWDrawConfig& config)
 	const int render_area_alignment = 128 * GSConfig.UpscaleMultiplier;
 	const GSVector2i rtsize(config.rt ? config.rt->GetSize() : config.ds->GetSize());
 	const GSVector4i render_area(
-		config.ps.hdr ? config.drawarea :
+		config.ps.colclip_hw ? config.drawarea :
                         GSVector4i(Common::AlignDownPow2(config.scissor.left, render_area_alignment),
 							Common::AlignDownPow2(config.scissor.top, render_area_alignment),
 							std::min(Common::AlignUpPow2(config.scissor.right, render_area_alignment), rtsize.x),
@@ -2866,10 +2866,10 @@ void GSDevice12::RenderHW(GSHWDrawConfig& config)
 	GSTexture12* hdr_rt = nullptr;
 
 	// Switch to hdr target for colclip rendering
-	if (pipe.ps.hdr)
+	if (pipe.ps.colclip_hw)
 	{
 		EndRenderPass();
-		hdr_rt = static_cast<GSTexture12*>(CreateRenderTarget(rtsize.x, rtsize.y, GSTexture::Format::HDRColor, false));
+		hdr_rt = static_cast<GSTexture12*>(CreateRenderTarget(rtsize.x, rtsize.y, GSTexture::Format::ColorClip, false));
 		if (!hdr_rt)
 		{
 			Console.WriteLn("Failed to allocate HDR render target, aborting draw.");
@@ -2941,7 +2941,7 @@ void GSDevice12::RenderHW(GSHWDrawConfig& config)
 	if (!m_in_render_pass)
 	{
 		GSVector4 clear_color = draw_rt ? draw_rt->GetUNormClearColor() : GSVector4::zero();
-		if (pipe.ps.hdr)
+		if (pipe.ps.colclip_hw)
 		{
 			// Denormalize clear color for HDR.
 			clear_color *= GSVector4::cxpr(255.0f / 65535.0f, 255.0f / 65535.0f, 255.0f / 65535.0f, 1.0f);

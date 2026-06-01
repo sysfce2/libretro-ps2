@@ -28,7 +28,7 @@ u32 GSTexture::GetCompressedBytesPerBlock(Format format)
 	static constexpr u32 bytes_per_block[] = {
 		1, // Invalid
 		4, // Color/RGBA8
-		8, // HDRColor/RGBA16
+		8, // ColorClip/RGBA16
 		4, // DepthStencil
 		1, // UNorm8/R8
 		2, // UInt16/R16UI

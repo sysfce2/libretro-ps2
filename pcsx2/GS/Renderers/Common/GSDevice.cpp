@@ -51,8 +51,8 @@ const char* shaderName(ShaderConvert value)
 		case ShaderConvert::DATM_0:                 return "ps_datm0";
 		case ShaderConvert::DATM_1_RTA_CORRECTION:  return "ps_datm1_rta_correction";
 		case ShaderConvert::DATM_0_RTA_CORRECTION:  return "ps_datm0_rta_correction";
-		case ShaderConvert::HDR_INIT:               return "ps_hdr_init";
-		case ShaderConvert::HDR_RESOLVE:            return "ps_hdr_resolve";
+		case ShaderConvert::COLCLIP_INIT:               return "ps_colclip_init";
+		case ShaderConvert::COLCLIP_RESOLVE:            return "ps_colclip_resolve";
 		case ShaderConvert::RTA_CORRECTION:         return "ps_rta_correction";
 		case ShaderConvert::RTA_DECORRECTION:       return "ps_rta_decorrection";
 		case ShaderConvert::TRANSPARENCY_FILTER:    return "ps_filter_transparency";

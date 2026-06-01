@@ -1481,7 +1481,7 @@ VkFormat GSDeviceVK::LookupNativeFormat(GSTexture::Format format) const
 	static constexpr std::array<VkFormat, static_cast<int>(GSTexture::Format::BC7) + 1> s_format_mapping = {{
 		VK_FORMAT_UNDEFINED, // Invalid
 		VK_FORMAT_R8G8B8A8_UNORM, // Color
-		VK_FORMAT_R16G16B16A16_UNORM, // HDRColor
+		VK_FORMAT_R16G16B16A16_UNORM, // ColorClip
 		VK_FORMAT_D32_SFLOAT_S8_UINT, // DepthStencil
 		VK_FORMAT_R8_UNORM, // UNorm8
 		VK_FORMAT_R16_UINT, // UInt16
@@ -2540,7 +2540,7 @@ bool GSDeviceVK::CreatePipelineLayouts()
 bool GSDeviceVK::CreateRenderPasses()
 {
 	const VkFormat rt_format = LookupNativeFormat(GSTexture::Format::Color);
-	const VkFormat hdr_rt_format = LookupNativeFormat(GSTexture::Format::HDRColor);
+	const VkFormat hdr_rt_format = LookupNativeFormat(GSTexture::Format::ColorClip);
 	const VkFormat depth_format = LookupNativeFormat(GSTexture::Format::DepthStencil);
 
 	for (u32 rt = 0; rt < 2; rt++)
@@ -2739,9 +2739,9 @@ bool GSDeviceVK::CompileConvertPipelines()
 				}
 			}
 		}
-		else if (i == ShaderConvert::HDR_INIT || i == ShaderConvert::HDR_RESOLVE)
+		else if (i == ShaderConvert::COLCLIP_INIT || i == ShaderConvert::COLCLIP_RESOLVE)
 		{
-			const bool is_setup = i == ShaderConvert::HDR_INIT;
+			const bool is_setup = i == ShaderConvert::COLCLIP_INIT;
 			VkPipeline(&arr)[2][2] = *(is_setup ? &m_hdr_setup_pipelines : &m_hdr_finish_pipelines);
 			for (u32 ds = 0; ds < 2; ds++)
 			{
@@ -3097,8 +3097,8 @@ VkShaderModule GSDeviceVK::GetTFXFragmentShader(const GSHWDrawConfig::PSSelector
 	AddMacro(ss, "PS_AEM", sel.aem);
 	AddMacro(ss, "PS_TFX", sel.tfx);
 	AddMacro(ss, "PS_TCC", sel.tcc);
-	AddMacro(ss, "PS_ATST", sel.atst);
-	AddMacro(ss, "PS_AFAIL", sel.afail);
+	AddMacro(ss, "PS_ATST", static_cast<u32>(sel.atst));
+	AddMacro(ss, "PS_AFAIL", static_cast<u32>(sel.afail));
 	AddMacro(ss, "PS_FOG", sel.fog);
 	AddMacro(ss, "PS_BLEND_HW", sel.blend_hw);
 	AddMacro(ss, "PS_A_MASKED", sel.a_masked);
@@ -3126,7 +3126,7 @@ VkShaderModule GSDeviceVK::GetTFXFragmentShader(const GSHWDrawConfig::PSSelector
 	AddMacro(ss, "PS_READ16_SRC", sel.real16src);
 	AddMacro(ss, "PS_WRITE_RG", sel.write_rg);
 	AddMacro(ss, "PS_FBMASK", sel.fbmask);
-	AddMacro(ss, "PS_HDR", sel.hdr);
+	AddMacro(ss, "PS_COLCLIP_HW", sel.colclip_hw);
 	AddMacro(ss, "PS_RTA_CORRECTION", sel.rta_correction);
 	AddMacro(ss, "PS_RTA_SRC_CORRECTION", sel.rta_source_correction);
 	AddMacro(ss, "PS_DITHER", sel.dither);
@@ -3180,7 +3180,7 @@ VkPipeline GSDeviceVK::CreateTFXPipeline(const PipelineSelector& p)
 	else
 	{
 		gpb.SetRenderPass(
-			GetTFXRenderPass(p.rt, p.ds, p.ps.hdr, p.dss.date,
+			GetTFXRenderPass(p.rt, p.ds, p.ps.colclip_hw, p.dss.date,
 				p.IsRTFeedbackLoop(), p.IsTestingAndSamplingDepth(),
 				p.rt ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				p.ds ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_DONT_CARE),
@@ -4015,11 +4015,11 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 	GSTextureVK* hdr_rt = nullptr;
 
 	// Switch to hdr target for colclip rendering
-	if (pipe.ps.hdr)
+	if (pipe.ps.colclip_hw)
 	{
 		EndRenderPass();
 
-		hdr_rt = static_cast<GSTextureVK*>(CreateRenderTarget(rtsize.x, rtsize.y, GSTexture::Format::HDRColor, false));
+		hdr_rt = static_cast<GSTextureVK*>(CreateRenderTarget(rtsize.x, rtsize.y, GSTexture::Format::ColorClip, false));
 		if (!hdr_rt)
 		{
 			if (date_image)
@@ -4105,7 +4105,7 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 	// input attachment read, it still wants the region/fragment-local barrier...
 	
 	const bool skip_first_barrier = 
-		(draw_rt && draw_rt->GetLayout() != GSTextureVK::Layout::FeedbackLoop && !pipe.ps.hdr && !IsDeviceAMD());
+		(draw_rt && draw_rt->GetLayout() != GSTextureVK::Layout::FeedbackLoop && !pipe.ps.colclip_hw && !IsDeviceAMD());
 
 	OMSetRenderTargets(draw_rt, draw_ds, config.scissor, static_cast<FeedbackLoopFlag>(pipe.feedback_loop_flags));
 	if (pipe.IsRTFeedbackLoop())
@@ -4122,13 +4122,13 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 	{
 		const VkAttachmentLoadOp rt_op = GetLoadOpForTexture(draw_rt);
 		const VkAttachmentLoadOp ds_op = GetLoadOpForTexture(draw_ds);
-		const VkRenderPass rp = GetTFXRenderPass(pipe.rt, pipe.ds, pipe.ps.hdr, config.destination_alpha == GSHWDrawConfig::DestinationAlphaMode::Stencil , pipe.IsRTFeedbackLoop(),
+		const VkRenderPass rp = GetTFXRenderPass(pipe.rt, pipe.ds, pipe.ps.colclip_hw, config.destination_alpha == GSHWDrawConfig::DestinationAlphaMode::Stencil , pipe.IsRTFeedbackLoop(),
 			pipe.IsTestingAndSamplingDepth(), rt_op, ds_op);
 		const bool is_clearing_rt = (rt_op == VK_ATTACHMENT_LOAD_OP_CLEAR || ds_op == VK_ATTACHMENT_LOAD_OP_CLEAR);
 
 		// Only draw to the active area of the HDR target. Except when depth is cleared, we need to use the full
 		// buffer size, otherwise it'll only clear the draw part of the depth buffer.
-		const GSVector4i render_area = (pipe.ps.hdr && ds_op != VK_ATTACHMENT_LOAD_OP_CLEAR) ? config.drawarea :
+		const GSVector4i render_area = (pipe.ps.colclip_hw && ds_op != VK_ATTACHMENT_LOAD_OP_CLEAR) ? config.drawarea :
 																							   GSVector4i::loadh(rtsize);
 
 		if (is_clearing_rt)
@@ -4139,7 +4139,7 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 			if (draw_rt)
 			{
 				GSVector4 clear_color = draw_rt->GetUNormClearColor();
-				if (pipe.ps.hdr)
+				if (pipe.ps.colclip_hw)
 				{
 					// Denormalize clear color for HDR.
 					clear_color *= GSVector4::cxpr(255.0f / 65535.0f, 255.0f / 65535.0f, 255.0f / 65535.0f, 1.0f);

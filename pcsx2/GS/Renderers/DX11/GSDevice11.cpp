@@ -1267,17 +1267,17 @@ void GSDevice11::RenderHW(GSHWDrawConfig& config)
 	}
 
 	GSTexture* hdr_rt = nullptr;
-	if (config.ps.hdr)
+	if (config.ps.colclip_hw)
 	{
 		const GSVector4 dRect(config.drawarea);
 		const GSVector4 sRect = dRect / GSVector4(rtsize.x, rtsize.y).xyxy();
-		hdr_rt = CreateRenderTarget(rtsize.x, rtsize.y, GSTexture::Format::HDRColor);
+		hdr_rt = CreateRenderTarget(rtsize.x, rtsize.y, GSTexture::Format::ColorClip);
 		if (!hdr_rt)
 			return;
 
 		// Warning: StretchRect must be called before BeginScene otherwise
 		// vertices will be overwritten. Trust me you don't want to do that.
-		StretchRect(config.rt, sRect, hdr_rt, dRect, ShaderConvert::HDR_INIT, false);
+		StretchRect(config.rt, sRect, hdr_rt, dRect, ShaderConvert::COLCLIP_INIT, false);
 	}
 
 	if (config.vs.expand != GSHWDrawConfig::VSExpand::None)
@@ -1410,7 +1410,7 @@ void GSDevice11::RenderHW(GSHWDrawConfig& config)
 		const GSVector2i size = config.rt->GetSize();
 		const GSVector4 dRect(config.drawarea);
 		const GSVector4 sRect = dRect / GSVector4(size.x, size.y).xyxy();
-		StretchRect(hdr_rt, sRect, config.rt, dRect, ShaderConvert::HDR_RESOLVE, false);
+		StretchRect(hdr_rt, sRect, config.rt, dRect, ShaderConvert::COLCLIP_RESOLVE, false);
 		Recycle(hdr_rt);
 	}
 }
@@ -1564,8 +1564,8 @@ void GSDevice11::SetupPS(const PSSelector& sel, const GSHWDrawConfig::PSConstant
 		sm.AddMacro("PS_TFX", sel.tfx);
 		sm.AddMacro("PS_TCC", sel.tcc);
 		sm.AddMacro("PS_DATE", sel.date);
-		sm.AddMacro("PS_ATST", sel.atst);
-		sm.AddMacro("PS_AFAIL", sel.afail);
+		sm.AddMacro("PS_ATST", static_cast<u32>(sel.atst));
+		sm.AddMacro("PS_AFAIL", static_cast<u32>(sel.afail));
 		sm.AddMacro("PS_FOG", sel.fog);
 		sm.AddMacro("PS_IIP", sel.iip);
 		sm.AddMacro("PS_BLEND_HW", sel.blend_hw);
@@ -1588,7 +1588,7 @@ void GSDevice11::SetupPS(const PSSelector& sel, const GSHWDrawConfig::PSConstant
 		sm.AddMacro("PS_DST_FMT", sel.dst_fmt);
 		sm.AddMacro("PS_DEPTH_FMT", sel.depth_fmt);
 		sm.AddMacro("PS_PAL_FMT", sel.pal_fmt);
-		sm.AddMacro("PS_HDR", sel.hdr);
+		sm.AddMacro("PS_COLCLIP_HW", sel.colclip_hw);
 		sm.AddMacro("PS_RTA_CORRECTION", sel.rta_correction);
 		sm.AddMacro("PS_RTA_SRC_CORRECTION", sel.rta_source_correction);
 		sm.AddMacro("PS_COLCLIP", sel.colclip);

@@ -37,7 +37,7 @@ DXGI_FORMAT GSTexture11::GetDXGIFormat(Format format)
 	switch (format)
 	{
 	case GSTexture::Format::Color:        return DXGI_FORMAT_R8G8B8A8_UNORM;
-	case GSTexture::Format::HDRColor:     return DXGI_FORMAT_R16G16B16A16_UNORM;
+	case GSTexture::Format::ColorClip:     return DXGI_FORMAT_R16G16B16A16_UNORM;
 	case GSTexture::Format::DepthStencil: return DXGI_FORMAT_R32G8X24_TYPELESS;
 	case GSTexture::Format::UNorm8:       return DXGI_FORMAT_A8_UNORM;
 	case GSTexture::Format::UInt16:       return DXGI_FORMAT_R16_UINT;

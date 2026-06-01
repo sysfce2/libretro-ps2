@@ -87,7 +87,7 @@ GSTextureOGL::GSTextureOGL(Type type, int width, int height, int levels, Format 
 			break;
 
 		// 4 channel float
-		case Format::HDRColor:
+		case Format::ColorClip:
 			gl_fmt = GL_RGBA16;
 			m_int_format = GL_RGBA;
 			m_int_type = GL_UNSIGNED_SHORT;

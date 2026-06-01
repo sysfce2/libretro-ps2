@@ -4431,7 +4431,7 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, const boo
 		else if (accumulation_blend)
 		{
 			// A fast algo that requires 2 passes
-			m_conf.ps.hdr = 1;
+			m_conf.ps.colclip_hw = 1;
 			sw_blending = true; // Enable sw blending for the HDR algo
 		}
 		else if (sw_blending)
@@ -4441,7 +4441,7 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, const boo
 		}
 		else
 		{
-			m_conf.ps.hdr = 1;
+			m_conf.ps.colclip_hw = 1;
 		}
 	}
 
@@ -4460,9 +4460,9 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, const boo
 				m_conf.ps.pabe     = 1;
 
 				// HDR mode should be disabled when doing sw blend, swap with sw colclip.
-				if (m_conf.ps.hdr)
+				if (m_conf.ps.colclip_hw)
 				{
-					m_conf.ps.hdr     = 0;
+					m_conf.ps.colclip_hw     = 0;
 					m_conf.ps.colclip = 1;
 				}
 			}
@@ -4526,7 +4526,7 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, const boo
 
 			if (blend.op == GSDevice::OP_REV_SUBTRACT)
 			{
-				if (m_conf.ps.hdr)
+				if (m_conf.ps.colclip_hw)
 				{
 					// HDR uses unorm, which is always positive
 					// Have the shader do the inversion, then clip to remove the negative
@@ -5425,32 +5425,32 @@ void GSRendererHW::EmulateATST(float& AREF, GSHWDrawConfig::PSSelector& ps, bool
 	{
 		case ATST_LESS:
 			AREF = aref - 0.1f;
-			ps.atst = 1;
+			ps.atst = GSShader::PS_ATST::LEQUAL;
 			break;
 		case ATST_LEQUAL:
 			AREF = aref - 0.1f + 1.0f;
-			ps.atst = 1;
+			ps.atst = GSShader::PS_ATST::LEQUAL;
 			break;
 		case ATST_GEQUAL:
 			AREF = aref - 0.1f;
-			ps.atst = 2;
+			ps.atst = GSShader::PS_ATST::GEQUAL;
 			break;
 		case ATST_GREATER:
 			AREF = aref - 0.1f + 1.0f;
-			ps.atst = 2;
+			ps.atst = GSShader::PS_ATST::GEQUAL;
 			break;
 		case ATST_EQUAL:
 			AREF = aref;
-			ps.atst = 3;
+			ps.atst = GSShader::PS_ATST::EQUAL;
 			break;
 		case ATST_NOTEQUAL:
 			AREF = aref;
-			ps.atst = 4;
+			ps.atst = GSShader::PS_ATST::NOTEQUAL;
 			break;
 		case ATST_NEVER: // Draw won't be done so no need to implement it in shader
 		case ATST_ALWAYS:
 		default:
-			ps.atst = 0;
+			ps.atst = GSShader::PS_ATST::NONE;
 			break;
 	}
 }
@@ -5887,7 +5887,7 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 		{
 			// Blending might be off, ensure it's enabled.
 			// We write the alpha pass/fail to SRC1_ALPHA, which is used to update A.
-			m_conf.ps.afail = AFAIL_RGB_ONLY;
+			m_conf.ps.afail = GSShader::PS_AFAIL::RGB_ONLY;
 			m_conf.ps.no_color1 = false;
 			if (!m_conf.blend.enable)
 			{
@@ -6119,7 +6119,7 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 		memcpy(&m_conf.alpha_second_pass.depth, &m_conf.depth, sizeof(m_conf.depth));
 
 		// Not doing single pass AFAIL.
-		m_conf.alpha_second_pass.ps.afail = AFAIL_KEEP;
+		m_conf.alpha_second_pass.ps.afail = GSShader::PS_AFAIL::KEEP;
 
 		if (ate_RGBA_then_Z)
 		{

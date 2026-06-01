@@ -1100,8 +1100,8 @@ std::string GSDeviceOGL::GetPSSource(const PSSelector& sel)
 	GSDeviceOGLAppendShaderMacro(macro, "PS_AEM", sel.aem);
 	GSDeviceOGLAppendShaderMacro(macro, "PS_TFX", sel.tfx);
 	GSDeviceOGLAppendShaderMacro(macro, "PS_TCC", sel.tcc);
-	GSDeviceOGLAppendShaderMacro(macro, "PS_ATST", sel.atst);
-	GSDeviceOGLAppendShaderMacro(macro, "PS_AFAIL", sel.afail);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_ATST", static_cast<u32>(sel.atst));
+	GSDeviceOGLAppendShaderMacro(macro, "PS_AFAIL", static_cast<u32>(sel.afail));
 	GSDeviceOGLAppendShaderMacro(macro, "PS_FOG", sel.fog);
 	GSDeviceOGLAppendShaderMacro(macro, "PS_BLEND_HW", sel.blend_hw);
 	GSDeviceOGLAppendShaderMacro(macro, "PS_A_MASKED", sel.a_masked);
@@ -1126,7 +1126,7 @@ std::string GSDeviceOGL::GetPSSource(const PSSelector& sel)
 	GSDeviceOGLAppendShaderMacro(macro, "PS_READ16_SRC", sel.real16src);
 	GSDeviceOGLAppendShaderMacro(macro, "PS_WRITE_RG", sel.write_rg);
 	GSDeviceOGLAppendShaderMacro(macro, "PS_FBMASK", sel.fbmask);
-	GSDeviceOGLAppendShaderMacro(macro, "PS_HDR", sel.hdr);
+	GSDeviceOGLAppendShaderMacro(macro, "PS_COLCLIP_HW", sel.colclip_hw);
 	GSDeviceOGLAppendShaderMacro(macro, "PS_RTA_CORRECTION", sel.rta_correction);
 	GSDeviceOGLAppendShaderMacro(macro, "PS_RTA_SRC_CORRECTION", sel.rta_source_correction);
 	GSDeviceOGLAppendShaderMacro(macro, "PS_DITHER", sel.dither);
@@ -1911,14 +1911,14 @@ void GSDeviceOGL::RenderHW(GSHWDrawConfig& config)
 
 	GSTexture* hdr_rt = nullptr;
 	GSTexture* draw_rt_clone = nullptr;
-	if (config.ps.hdr)
+	if (config.ps.colclip_hw)
 	{
-		hdr_rt = CreateRenderTarget(rtsize.x, rtsize.y, GSTexture::Format::HDRColor, false);
+		hdr_rt = CreateRenderTarget(rtsize.x, rtsize.y, GSTexture::Format::ColorClip, false);
 		OMSetRenderTargets(hdr_rt, config.ds, &config.scissor);
 
 		GSVector4 dRect(config.drawarea);
 		const GSVector4 sRect = dRect / GSVector4(rtsize.x, rtsize.y).xyxy();
-		StretchRect(config.rt, sRect, hdr_rt, dRect, ShaderConvert::HDR_INIT, false);
+		StretchRect(config.rt, sRect, hdr_rt, dRect, ShaderConvert::COLCLIP_INIT, false);
 	}
 	else if (config.require_one_barrier && !m_features.texture_barrier)
 	{
@@ -2129,7 +2129,7 @@ void GSDeviceOGL::RenderHW(GSHWDrawConfig& config)
 		GSVector2i size = config.rt->GetSize();
 		GSVector4 dRect(config.drawarea);
 		const GSVector4 sRect = dRect / GSVector4(size.x, size.y).xyxy();
-		StretchRect(hdr_rt, sRect, config.rt, dRect, ShaderConvert::HDR_RESOLVE, false);
+		StretchRect(hdr_rt, sRect, config.rt, dRect, ShaderConvert::COLCLIP_RESOLVE, false);
 
 		Recycle(hdr_rt);
 	}
