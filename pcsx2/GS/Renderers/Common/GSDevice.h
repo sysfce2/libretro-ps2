@@ -138,7 +138,7 @@ enum ChannelFetch
 	ChannelFetch_GXBY  = 6
 };
 
-/* HW blend_hw shader bit values (m_conf.ps.blend_hw / blend_second_pass.blend_hw) */
+/* HW blend_hw shader bit values (m_conf.ps.blend_hw / blend_multi_pass.blend_hw) */
 #define HW_BLEND_SRC_ONE_DST_FACTOR      1 /* Use the dest color as blend factor, Cs is set to 1. */
 #define HW_BLEND_SRC_ALPHA_DST_FACTOR    2 /* Use the dest color as blend factor, Cs is set to (Alpha - 1). */
 #define HW_BLEND_SRC_DOUBLE              3 /* Double source color. */
@@ -662,7 +662,7 @@ struct alignas(16) GSHWDrawConfig
 
 	AlphaPass alpha_second_pass;
 
-	struct BlendPass
+	struct BlendMultiPass
 	{
 		BlendState blend;
 		u8 blend_hw;
@@ -670,7 +670,7 @@ struct alignas(16) GSHWDrawConfig
 		bool enable;
 	};
 
-	BlendPass blend_second_pass;
+	BlendMultiPass blend_multi_pass;
 
 	VSConstantBuffer cb_vs;
 	PSConstantBuffer cb_ps;
