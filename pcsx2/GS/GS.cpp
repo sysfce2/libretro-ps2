@@ -575,10 +575,22 @@ void GSSwitchRenderer(GSRendererType new_renderer, enum retro_hw_context_type ap
 
 #ifdef _WIN32
 
+#include "../../common/RedtapeWindows.h"
+
 static HANDLE s_fh = NULL;
+/* Set when the active mapping was made with the Win10 placeholder APIs
+ * (VirtualAlloc2 / MapViewOfFile3); cleared when the Win8 MapViewOfFileEx
+ * fallback was used, so GSFreeWrappedMemory tears down the right way. */
+static bool s_fh_placeholder = false;
 
 void* GSAllocateWrappedMemory(size_t size, size_t repeat)
 {
+	PCSX2_VirtualAlloc2_t pVirtualAlloc2 = nullptr;
+	PCSX2_MapViewOfFile3_t pMapViewOfFile3 = nullptr;
+	PCSX2_UnmapViewOfFile2_t pUnmapViewOfFile2 = nullptr;
+	const bool have_placeholders = PCSX2_HasPlaceholderAPIs(
+		&pVirtualAlloc2, &pMapViewOfFile3, &pUnmapViewOfFile2);
+
 	s_fh = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, size, nullptr);
 	if (s_fh == NULL)
 	{
@@ -586,50 +598,116 @@ void* GSAllocateWrappedMemory(size_t size, size_t repeat)
 		return nullptr;
 	}
 
-	// Reserve the whole area with repeats.
-	u8* base = static_cast<u8*>(VirtualAlloc2(
-		GetCurrentProcess(), nullptr, repeat * size,
-		MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS,
-		nullptr, 0));
-	if (base)
+	if (have_placeholders)
 	{
+		s_fh_placeholder = true;
+
+		// Reserve the whole area with repeats.
+		u8* base = static_cast<u8*>(pVirtualAlloc2(
+			GetCurrentProcess(), nullptr, repeat * size,
+			MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS,
+			nullptr, 0));
+		if (base)
+		{
+			bool okay = true;
+			for (size_t i = 0; i < repeat; i++)
+			{
+				// Everything except the last needs the placeholders split to map over them. Then map the same file over the region.
+				u8* addr = base + i * size;
+				if ((i != (repeat - 1) && !VirtualFreeEx(GetCurrentProcess(), addr, size, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER)) ||
+					!pMapViewOfFile3(s_fh, GetCurrentProcess(), addr, 0, size, MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, nullptr, 0))
+				{
+					Console.Error("Failed to map repeat %zu of size %zu.", i, size);
+					okay = false;
+
+					for (size_t j = 0; j < i; j++)
+						pUnmapViewOfFile2(GetCurrentProcess(), addr, MEM_PRESERVE_PLACEHOLDER);
+				}
+			}
+
+			if (okay)
+				return base;
+
+			VirtualFreeEx(GetCurrentProcess(), base, 0, MEM_RELEASE);
+		}
+
+		Console.Error("Failed to reserve VA space of size %zu. WIN API ERROR:%u", size, GetLastError());
+		CloseHandle(s_fh);
+		s_fh = NULL;
+		return nullptr;
+	}
+
+	/* Windows 8 / 8.1 fallback: no placeholder APIs. Reserve a
+	 * contiguous repeat*size region to find a free hole, release it,
+	 * then map the same file view into each slot with MapViewOfFileEx
+	 * (available since Windows 2000). There is a small TOCTOU window
+	 * between the release and the maps, but GS memory is set up once
+	 * during single-threaded init, so nothing else is allocating here. */
+	s_fh_placeholder = false;
+	{
+		u8* base = static_cast<u8*>(VirtualAlloc(nullptr, repeat * size,
+			MEM_RESERVE, PAGE_NOACCESS));
+		if (!base)
+		{
+			Console.Error("Failed to reserve VA space of size %zu. WIN API ERROR:%u", repeat * size, GetLastError());
+			CloseHandle(s_fh);
+			s_fh = NULL;
+			return nullptr;
+		}
+
+		/* Release the reservation; MapViewOfFileEx cannot map into a
+		 * region that is still reserved. */
+		VirtualFree(base, 0, MEM_RELEASE);
+
 		bool okay = true;
+		size_t mapped = 0;
 		for (size_t i = 0; i < repeat; i++)
 		{
-			// Everything except the last needs the placeholders split to map over them. Then map the same file over the region.
 			u8* addr = base + i * size;
-			if ((i != (repeat - 1) && !VirtualFreeEx(GetCurrentProcess(), addr, size, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER)) ||
-				!MapViewOfFile3(s_fh, GetCurrentProcess(), addr, 0, size, MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, nullptr, 0))
+			if (!MapViewOfFileEx(s_fh, FILE_MAP_ALL_ACCESS, 0, 0, size, addr))
 			{
 				Console.Error("Failed to map repeat %zu of size %zu.", i, size);
 				okay = false;
-
-				for (size_t j = 0; j < i; j++)
-					UnmapViewOfFile2(GetCurrentProcess(), addr, MEM_PRESERVE_PLACEHOLDER);
+				break;
 			}
+			mapped++;
 		}
 
 		if (okay)
 			return base;
 
-		VirtualFreeEx(GetCurrentProcess(), base, 0, MEM_RELEASE);
-	}
+		for (size_t j = 0; j < mapped; j++)
+			UnmapViewOfFile(base + j * size);
 
-	Console.Error("Failed to reserve VA space of size %zu. WIN API ERROR:%u", size, GetLastError());
-	CloseHandle(s_fh);
-	s_fh = NULL;
-	return nullptr;
+		CloseHandle(s_fh);
+		s_fh = NULL;
+		return nullptr;
+	}
 }
 
 void GSFreeWrappedMemory(void* ptr, size_t size, size_t repeat)
 {
-	for (size_t i = 0; i < repeat; i++)
+	if (s_fh_placeholder)
 	{
-		u8* addr = (u8*)ptr + i * size;
-		UnmapViewOfFile2(GetCurrentProcess(), addr, MEM_PRESERVE_PLACEHOLDER);
+		PCSX2_UnmapViewOfFile2_t pUnmapViewOfFile2 = nullptr;
+		PCSX2_HasPlaceholderAPIs(nullptr, nullptr, &pUnmapViewOfFile2);
+		for (size_t i = 0; i < repeat; i++)
+		{
+			u8* addr = (u8*)ptr + i * size;
+			pUnmapViewOfFile2(GetCurrentProcess(), addr, MEM_PRESERVE_PLACEHOLDER);
+		}
+
+		VirtualFreeEx(GetCurrentProcess(), ptr, 0, MEM_RELEASE);
+	}
+	else
+	{
+		/* Win8 fallback: each repeat is an independent file view. */
+		for (size_t i = 0; i < repeat; i++)
+			UnmapViewOfFile((u8*)ptr + i * size);
 	}
 
-	VirtualFreeEx(GetCurrentProcess(), ptr, 0, MEM_RELEASE);
+	if (s_fh)
+		CloseHandle(s_fh);
 	s_fh = NULL;
 }
 

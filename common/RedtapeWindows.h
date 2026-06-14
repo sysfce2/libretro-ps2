@@ -32,4 +32,66 @@
 
 #include <windows.h>
 
+/* Runtime-resolved wrappers for the Win10 1803+ placeholder memory APIs
+ * (VirtualAlloc2 / MapViewOfFile3 / UnmapViewOfFile2).
+ *
+ * These are used for fastmem (HostSys.cpp) and the GS local-memory mirror
+ * (GS.cpp). Calling them as ordinary imports forces them into the DLL's
+ * import table, which means the loader cannot resolve the module on
+ * Windows 8 / 8.1 (where the symbols do not exist) and the whole core
+ * fails to load before any code runs - even though both subsystems can
+ * cope without these APIs (fastmem falls back to slowpath load/stores,
+ * GS to a plain contiguous mapping). Resolving them through
+ * GetProcAddress instead keeps them out of the import table, so the
+ * module loads everywhere and each caller can branch on availability.
+ *
+ * On Windows 10+ these resolve on first use and behave exactly as the
+ * direct calls did; only the (otherwise unreachable on Win10) absence
+ * path is new. */
+typedef PVOID (WINAPI *PCSX2_VirtualAlloc2_t)(HANDLE, PVOID, SIZE_T,
+	ULONG, ULONG, MEM_EXTENDED_PARAMETER*, ULONG);
+typedef PVOID (WINAPI *PCSX2_MapViewOfFile3_t)(HANDLE, HANDLE, PVOID,
+	ULONG64, SIZE_T, ULONG, ULONG, MEM_EXTENDED_PARAMETER*, ULONG);
+typedef BOOL (WINAPI *PCSX2_UnmapViewOfFile2_t)(HANDLE, PVOID, ULONG);
+
+/* Resolved once from kernelbase.dll (where the placeholder APIs live on
+ * Win10). Returns true only if all three are present, i.e. the full
+ * placeholder workflow is usable. */
+static inline bool PCSX2_HasPlaceholderAPIs(
+	PCSX2_VirtualAlloc2_t* out_valloc2,
+	PCSX2_MapViewOfFile3_t* out_map3,
+	PCSX2_UnmapViewOfFile2_t* out_unmap2)
+{
+	static bool s_resolved = false;
+	static PCSX2_VirtualAlloc2_t s_valloc2 = nullptr;
+	static PCSX2_MapViewOfFile3_t s_map3 = nullptr;
+	static PCSX2_UnmapViewOfFile2_t s_unmap2 = nullptr;
+
+	if (!s_resolved)
+	{
+		/* kernelbase.dll is always loaded; GetModuleHandle avoids an
+		 * extra reference and the symbols forward there on Win10. */
+		HMODULE kb = GetModuleHandleW(L"kernelbase.dll");
+		if (kb)
+		{
+			s_valloc2 = reinterpret_cast<PCSX2_VirtualAlloc2_t>(
+				reinterpret_cast<void*>(GetProcAddress(kb, "VirtualAlloc2")));
+			s_map3 = reinterpret_cast<PCSX2_MapViewOfFile3_t>(
+				reinterpret_cast<void*>(GetProcAddress(kb, "MapViewOfFile3")));
+			s_unmap2 = reinterpret_cast<PCSX2_UnmapViewOfFile2_t>(
+				reinterpret_cast<void*>(GetProcAddress(kb, "UnmapViewOfFile2")));
+		}
+		s_resolved = true;
+	}
+
+	if (out_valloc2)
+		*out_valloc2 = s_valloc2;
+	if (out_map3)
+		*out_map3 = s_map3;
+	if (out_unmap2)
+		*out_unmap2 = s_unmap2;
+
+	return (s_valloc2 && s_map3 && s_unmap2);
+}
+
 #endif

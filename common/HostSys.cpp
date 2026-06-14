@@ -470,6 +470,16 @@ std::unique_ptr<SharedMemoryMappingArea> SharedMemoryMappingArea::Create(size_t 
 	 * the same strategy the Beetle PSX dynarec uses to place its
 	 * mappings. The ladder starts at 4 GB (the minimum usable base, see
 	 * the rejection below) and runs to 36 GB, matching that range. */
+	PCSX2_VirtualAlloc2_t pVirtualAlloc2 = nullptr;
+	if (!PCSX2_HasPlaceholderAPIs(&pVirtualAlloc2, nullptr, nullptr))
+	{
+		/* Windows 8 / 8.1: no placeholder APIs. The Map()/Unmap()
+		 * workflow below relies on them, so there is no usable fastmem
+		 * area here. Return null and let vtlb_Core_Alloc fall back to
+		 * no-fastmem mode (slower, but fully functional). */
+		return nullptr;
+	}
+
 	void* alloc = nullptr;
 	for (uintptr_t floor = 0x100000000ULL; floor <= 0x900000000ULL;
 		floor += 0x100000000ULL)
@@ -481,7 +491,7 @@ std::unique_ptr<SharedMemoryMappingArea> SharedMemoryMappingArea::Create(size_t 
 		param.Type = MemExtendedParameterAddressRequirements;
 		param.Pointer = &req;
 
-		alloc = VirtualAlloc2(GetCurrentProcess(), nullptr, size,
+		alloc = pVirtualAlloc2(GetCurrentProcess(), nullptr, size,
 			MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS,
 			&param, 1);
 		if (alloc)
@@ -494,7 +504,7 @@ std::unique_ptr<SharedMemoryMappingArea> SharedMemoryMappingArea::Create(size_t 
 	 * caller fall back to no-fastmem mode. */
 	if (!alloc)
 	{
-		alloc = VirtualAlloc2(GetCurrentProcess(), nullptr, size,
+		alloc = pVirtualAlloc2(GetCurrentProcess(), nullptr, size,
 			MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS,
 			nullptr, 0);
 	}
@@ -580,8 +590,12 @@ u8* SharedMemoryMappingArea::Map(void* file_handle, size_t file_offset, void* ma
 				MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER);
 	}
 
-	/* actually do the mapping, replacing the placeholder on the range */
-	if (!MapViewOfFile3(static_cast<HANDLE>(file_handle), GetCurrentProcess(),
+	/* actually do the mapping, replacing the placeholder on the range.
+	 * The pointer is guaranteed non-null: this area only exists when
+	 * Create() found all three placeholder APIs. */
+	PCSX2_MapViewOfFile3_t pMapViewOfFile3 = nullptr;
+	PCSX2_HasPlaceholderAPIs(nullptr, &pMapViewOfFile3, nullptr);
+	if (!pMapViewOfFile3(static_cast<HANDLE>(file_handle), GetCurrentProcess(),
 			map_base, file_offset, map_size, MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, nullptr, 0))
 		return nullptr;
 
@@ -610,8 +624,11 @@ bool SharedMemoryMappingArea::Unmap(void* map_base, size_t map_size)
 {
 #ifdef _WIN32
 	const size_t map_offset = static_cast<u8*>(map_base) - m_base_ptr;
-	/* unmap the specified range */
-	if (!UnmapViewOfFile2(GetCurrentProcess(), map_base, MEM_PRESERVE_PLACEHOLDER))
+	/* unmap the specified range. The pointer is guaranteed non-null:
+	 * this area only exists when Create() found all three APIs. */
+	PCSX2_UnmapViewOfFile2_t pUnmapViewOfFile2 = nullptr;
+	PCSX2_HasPlaceholderAPIs(nullptr, nullptr, &pUnmapViewOfFile2);
+	if (!pUnmapViewOfFile2(GetCurrentProcess(), map_base, MEM_PRESERVE_PLACEHOLDER))
 		return false;
 
 	/* can we coalesce to the left? */
