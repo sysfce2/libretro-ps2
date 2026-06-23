@@ -28,7 +28,7 @@ add_granite_internal_lib(granite-vulkan
         vulkan_common.hpp
         event_manager.cpp event_manager.hpp
         breadcrumbs.cpp breadcrumbs.hpp
-        pipeline_event.hpp
+        pipeline_event.cpp pipeline_event.hpp
         query_pool.cpp query_pool.hpp
         texture/texture_format.cpp texture/texture_format.hpp)
 
